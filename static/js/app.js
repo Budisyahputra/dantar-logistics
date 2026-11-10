@@ -1,25 +1,64 @@
 let dbCache = [];
 let aktif = null;
+let csrfToken = '';
+let dataAdminDimuat = false;
 
 async function muatSemuaData() {
   try {
     const res = await fetch('/api/shipments');
-    dbCache = await res.json();
+    if (res.status === 401) {
+      csrfToken = '';
+      dataAdminDimuat = false;
+      window.location.assign('/admin/login');
+      return false;
+    }
+    if (!res.ok) throw new Error(`Request gagal (${res.status})`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Format data kiriman tidak valid');
+    dbCache = data;
     if (dbCache.length && !aktif) aktif = dbCache[0];
+    dataAdminDimuat = true;
     renderTabel();
     isiDropdownCetak();
+    return true;
   } catch (err) {
     console.error("Gagal memuat data dari server:", err);
+    alert('Data admin gagal dimuat. Coba muat ulang halaman.');
+    return false;
   }
 }
 
-function bukaTab(id) {
+async function cekSesiAdmin() {
+  const res = await fetch('/api/admin/session');
+  if (!res.ok) throw new Error(`Server merespons HTTP ${res.status}`);
+  const data = await res.json();
+  if (typeof data.authenticated !== 'boolean') {
+    throw new Error('Respons status sesi tidak valid');
+  }
+  csrfToken = data.csrf_token || '';
+  return data.authenticated;
+}
+
+async function bukaTab(id) {
+  if (id === 'admin' || id === 'print') {
+    try {
+      if (!await cekSesiAdmin()) {
+        window.location.assign('/admin/login');
+        return;
+      }
+    } catch (err) {
+      console.error('Gagal memverifikasi sesi admin:', err);
+      alert(`Tidak dapat memverifikasi sesi admin. ${err.message || 'Periksa koneksi ke server.'}`);
+      return;
+    }
+    if (!dataAdminDimuat && !await muatSemuaData()) return;
+  }
+
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-' + id).classList.add('active');
   document.getElementById('btn-' + id).classList.add('active');
   if (id === 'print') { isiDropdownCetak(); renderCetakan(); }
-  if (id === 'admin') muatSemuaData();
   window.scrollTo(0, 0);
 }
 
@@ -108,9 +147,12 @@ function bukaModal() {
 function tutupModal() { document.getElementById('modalPod').classList.remove('open'); }
 
 function loncatKeCetak() {
-  bukaTab('print');
-  if (aktif) document.getElementById('selResiCetak').value = aktif.resi;
-  renderCetakan();
+  bukaTab('print').then(() => {
+    if (document.getElementById('view-print').classList.contains('active')) {
+      if (aktif) document.getElementById('selResiCetak').value = aktif.resi;
+      renderCetakan();
+    }
+  });
 }
 
 function qrSvg(teks) {
@@ -231,7 +273,7 @@ async function buatResiServer() {
 
   const res = await fetch('/api/shipments', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
     body: JSON.stringify(payload)
   });
   const json = await res.json();
@@ -245,6 +287,20 @@ function unduhExcelServer() {
   window.location.href = '/api/export-excel';
 }
 
+async function logoutAdmin() {
+  const res = await fetch('/admin/logout', {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': csrfToken }
+  });
+  if (res.ok) {
+    csrfToken = '';
+    dataAdminDimuat = false;
+    window.location.assign('/');
+  } else {
+    alert('Sesi tidak dapat ditutup. Muat ulang halaman dan coba lagi.');
+  }
+}
+
 async function unggahExcelServer(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -253,6 +309,7 @@ async function unggahExcelServer(e) {
 
   const res = await fetch('/api/upload-excel', {
     method: 'POST',
+    headers: { 'X-CSRF-Token': csrfToken },
     body: formData
   });
   const json = await res.json();
@@ -266,7 +323,7 @@ async function unggahExcelServer(e) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   hitungTarif();
-  await muatSemuaData();
   document.getElementById('trackInput').value = 'DAN-B2B-2611-0001';
   prosesLacak();
+  if (new URLSearchParams(window.location.search).has('admin')) bukaTab('admin');
 });

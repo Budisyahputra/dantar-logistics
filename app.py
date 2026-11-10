@@ -1,11 +1,47 @@
 import os
 import io
-from datetime import datetime
-from flask import Flask, request, jsonify, render_template, send_file
+import hmac
+import secrets
+from datetime import datetime, timedelta
+from functools import wraps
+from flask import Flask, request, jsonify, render_template, send_file, redirect, session, url_for
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
+app.config.update(
+    SECRET_KEY=os.environ.get('SECRET_KEY'),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+    SESSION_COOKIE_SECURE=os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true',
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
+)
+
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', '')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', '')
+
+
+def secure_equals(value, expected):
+    return hmac.compare_digest(value.encode('utf-8'), expected.encode('utf-8'))
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if not session.get('admin_authenticated'):
+            return jsonify({"error": "Login admin diperlukan"}), 401
+
+        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+            csrf_token = request.headers.get('X-CSRF-Token', '')
+            session_token = session.get('csrf_token', '')
+            if not csrf_token or not secure_equals(csrf_token, session_token):
+                return jsonify({"error": "Token keamanan tidak valid"}), 403
+
+        return view(*args, **kwargs)
+    return wrapped
 
 # Menggunakan PostgreSQL dari Docker, atau fallback ke SQLite jika dijalankan lokal tanpa Docker
 db_url = os.environ.get('DATABASE_URL', 'sqlite:///dantar_local.db')
@@ -92,7 +128,86 @@ with app.app_context():
 def index():
     return render_template('index.html')
 
+@app.route('/admin/login', methods=['GET', 'POST'])
+def admin_login():
+    if not app.config['SECRET_KEY'] or app.config['SECRET_KEY'].startswith('replace-with-'):
+        return render_template(
+            'admin_login.html',
+            csrf_token='',
+            error='Login belum tersedia. Atur SECRET_KEY pada konfigurasi environment.',
+            disabled=True
+        ), 503
+
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD or ADMIN_PASSWORD.startswith('replace-with-'):
+        return render_template(
+            'admin_login.html',
+            csrf_token='',
+            error='Login belum dikonfigurasi. Atur ADMIN_USERNAME dan ADMIN_PASSWORD pada file .env.',
+            disabled=True
+        ), 503
+
+    if session.get('admin_authenticated') and request.method == 'GET':
+        return redirect(url_for('index', admin='1'))
+
+    if request.method == 'POST':
+        csrf_token = request.form.get('csrf_token', '')
+        session_token = session.get('csrf_token', '')
+        if not csrf_token or not secure_equals(csrf_token, session_token):
+            return render_template(
+                'admin_login.html',
+                csrf_token=session_token,
+                error='Sesi formulir tidak valid. Muat ulang halaman dan coba lagi.',
+                disabled=False
+            ), 400
+
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        valid_username = secure_equals(username, ADMIN_USERNAME)
+        valid_password = secure_equals(password, ADMIN_PASSWORD)
+        if valid_username and valid_password:
+            session.clear()
+            session.permanent = True
+            session['admin_authenticated'] = True
+            session['csrf_token'] = secrets.token_urlsafe(32)
+            return redirect(url_for('index', admin='1'))
+
+        return render_template(
+            'admin_login.html',
+            csrf_token=session_token,
+            error='Nama pengguna atau kata sandi tidak sesuai.',
+            disabled=False
+        ), 401
+
+    session['csrf_token'] = secrets.token_urlsafe(32)
+    return render_template(
+        'admin_login.html',
+        csrf_token=session['csrf_token'],
+        error='',
+        disabled=False
+    )
+
+@app.route('/admin/logout', methods=['POST'])
+def admin_logout():
+    csrf_token = request.headers.get('X-CSRF-Token', '')
+    session_token = session.get('csrf_token', '')
+    if not session.get('admin_authenticated'):
+        return jsonify({"error": "Login admin diperlukan"}), 401
+    if not csrf_token or not secure_equals(csrf_token, session_token):
+        return jsonify({"error": "Token keamanan tidak valid"}), 403
+
+    session.clear()
+    return jsonify({"message": "Logout berhasil"})
+
+@app.route('/api/admin/session', methods=['GET'])
+def admin_session():
+    authenticated = bool(session.get('admin_authenticated'))
+    return jsonify({
+        "authenticated": authenticated,
+        "csrf_token": session.get('csrf_token') if authenticated else None
+    })
+
 @app.route('/api/shipments', methods=['GET'])
+@admin_required
 def get_all_shipments():
     items = Shipment.query.order_by(Shipment.id.desc()).all()
     return jsonify([i.to_dict() for i in items])
@@ -115,6 +230,7 @@ def track_shipment():
     return jsonify({"found": True, "data": item.to_dict()})
 
 @app.route('/api/shipments', methods=['POST'])
+@admin_required
 def create_shipment():
     body = request.json or {}
     tipe = str(body.get('tipe', 'B2B')).strip().upper()
@@ -146,6 +262,7 @@ def create_shipment():
     return jsonify({"message": "Resi berhasil dibuat", "data": baru.to_dict()}), 201
 
 @app.route('/api/upload-excel', methods=['POST'])
+@admin_required
 def upload_excel():
     if 'file' not in request.files:
         return jsonify({"error": "File Excel tidak ditemukan"}), 400
@@ -195,6 +312,7 @@ def upload_excel():
         return jsonify({"error": f"Gagal memproses Excel: {str(e)}"}), 500
 
 @app.route('/api/export-excel', methods=['GET'])
+@admin_required
 def export_excel():
     items = Shipment.query.order_by(Shipment.id.asc()).all()
     rows = [{
