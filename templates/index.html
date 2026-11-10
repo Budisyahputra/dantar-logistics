@@ -10,14 +10,17 @@
 
   <header class="navbar no-print">
     <div class="nav-top">
-      <div class="brand" onclick="bukaTab('home')"><span>D'ANTAR</span> Logistik B2B & B2C</div>
-      <div style="font-size:12px; color:#94a3b8;">Docker + Flask + PostgreSQL</div>
-    </div>
-    <div class="nav-tabs">
-      <button class="tab-btn active" id="btn-home" onclick="bukaTab('home')">Beranda</button>
-      <button class="tab-btn" id="btn-track" onclick="bukaTab('track')">Lacak Kiriman</button>
-      <button class="tab-btn" id="btn-print" onclick="bukaTab('print')">Cetak Resi</button>
-      <button class="tab-btn" id="btn-admin" onclick="bukaTab('admin')">Portal Admin (Excel)</button>
+      <button class="brand" onclick="bukaTab('home')" aria-label="D'Antar Logistik, beranda">
+        <span class="brand-mark" aria-hidden="true">D</span>
+        <span class="brand-copy"><strong>D'ANTAR</strong><small>LOGISTIK</small></span>
+      </button>
+      <nav class="nav-tabs" aria-label="Navigasi utama">
+        <button class="tab-btn active" id="btn-home" onclick="bukaTab('home')">Beranda</button>
+        <button class="tab-btn" id="btn-track" onclick="bukaTab('track')">Lacak Kiriman</button>
+        <button class="tab-btn" id="btn-print" onclick="bukaTab('print')">Cetak Resi</button>
+        <button class="tab-btn" id="btn-admin" onclick="bukaTab('admin')">Portal Admin</button>
+      </nav>
+      <button class="nav-cta" onclick="bukaTab('track')">Lacak paket <span aria-hidden="true">↗</span></button>
     </div>
   </header>
 
@@ -25,58 +28,141 @@
 
     <!-- 1. BERANDA -->
     <section id="view-home" class="view active">
-      <div class="hero">
-        <span class="hero-badge">Ekspedisi Hybrid Kargo Vendor (B2B) & Ritel (B2C)</span>
-        <h1>Pengiriman Kargo Antar-Gudang & Paket Ritel Terintegrasi</h1>
-        <p>Lacak posisi muatan dengan Nomor Resi, Nomor Surat Jalan (DO), atau Nomor PO. Dilengkapi verifikasi stempel basah POD dan sinkronisasi langsung dengan Microsoft Excel.</p>
-        <div class="quick-box">
-          <div style="font-size:11px; font-weight:700; margin-bottom:6px;">LACAK CEPAT (NO. RESI / SURAT JALAN / PO)</div>
-          <div class="input-row">
-            <input type="text" id="heroInput" class="input" placeholder="Contoh: DAN-B2B-2611-0001 atau SJ-2026-881">
-            <button class="btn" onclick="lacakDariHero()">Lacak Sekarang</button>
+      <section class="landing-hero" aria-labelledby="landing-title">
+        <div class="landing-copy">
+          <span class="eyebrow"><span class="eyebrow-dot"></span> SOLUSI LOGISTIK B2B & B2C</span>
+          <h1 id="landing-title">Pengiriman bergerak.<br><span>Bisnis ikut melaju.</span></h1>
+          <p>Kelola kargo antar-vendor dan paket ritel dalam satu alur. Pantau status kiriman dengan nomor resi, Surat Jalan, atau PO.</p>
+          <div class="hero-actions">
+            <button class="btn hero-primary" onclick="bukaTab('track')">Lacak kiriman <span aria-hidden="true">→</span></button>
+            <a class="hero-link" href="#landing-services">Jelajahi layanan <span aria-hidden="true">↓</span></a>
           </div>
-          <div class="chips">
-            <span class="chip" onclick="pilihContoh('DAN-B2B-2611-0001')">DAN-B2B-2611-0001 (B2B)</span>
-            <span class="chip" onclick="pilihContoh('SJ-2026-882')">SJ-2026-882 (No. SJ)</span>
-            <span class="chip" onclick="pilihContoh('DAN-B2C-2611-0101')">DAN-B2C-2611-0101 (B2C)</span>
-          </div>
+          <div class="hero-caption"><span class="caption-icon" aria-hidden="true">✓</span> B2B dan B2C, terhubung dalam satu sistem</div>
         </div>
-      </div>
+        <div class="hero-art" aria-label="Ilustrasi pengiriman D'Antar Logistik">
+          <div class="art-orbit orbit-one"></div>
+          <div class="art-orbit orbit-two"></div>
+          <div class="route-pill"><span class="route-pulse"></span> STATUS PENGIRIMAN <strong>TERPANTAU</strong></div>
+          <svg class="truck-illustration" viewBox="0 0 520 340" role="img" aria-label="Truk logistik melaju di jalan">
+            <path d="M37 275c85-24 139-22 221-2s142 22 230-10" fill="none" stroke="#fdba74" stroke-width="3" stroke-dasharray="8 12" opacity=".8"/>
+            <path d="M57 283h408" stroke="#f8fafc" stroke-width="2" opacity=".28"/>
+            <path d="M96 124h226a14 14 0 0 1 14 14v104H82V138a14 14 0 0 1 14-14Z" fill="#f97316"/>
+            <path d="M336 166h67l51 56v20H336Z" fill="#fb923c"/>
+            <path d="M355 178h39l31 35h-70Z" fill="#ffedd5"/>
+            <path d="M65 241h400v19H65z" fill="#fed7aa"/>
+            <path d="M115 145h190v63H115z" fill="#fff7ed" opacity=".16"/>
+            <path d="M145 176h127" stroke="#fff7ed" stroke-width="7" stroke-linecap="round" opacity=".85"/>
+            <path d="M145 193h83" stroke="#fff7ed" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+            <circle cx="147" cy="260" r="28" fill="#172033"/><circle cx="147" cy="260" r="12" fill="#cbd5e1"/>
+            <circle cx="386" cy="260" r="28" fill="#172033"/><circle cx="386" cy="260" r="12" fill="#cbd5e1"/>
+            <path d="M68 231h22v-33H68a9 9 0 0 0-9 9v15a9 9 0 0 0 9 9Z" fill="#fef3c7"/>
+            <path d="M450 226h16v13h-16z" fill="#fff7ed"/>
+          </svg>
+          <div class="floating-note note-top"><span class="note-icon">↗</span><span><small>REFERENSI FLEKSIBEL</small><strong>Resi · SJ · PO</strong></span></div>
+          <div class="floating-note note-bottom"><span class="note-icon note-check">✓</span><span><small>UNTUK BISNIS & PERSONAL</small><strong>Satu partner logistik</strong></span></div>
+        </div>
+      </section>
 
-      <div class="card">
-        <h3>Kalkulator Estimasi Tarif & Rekomendasi Armada</h3>
-        <p class="sub">Perhitungan otomatis berdasarkan berat aktual (Kg) atau kubikasi (CBM)</p>
-        <div class="grid-2" style="margin-bottom:12px;">
-          <div>
-            <label class="lbl-input">Jenis Layanan</label>
-            <select id="cTipe" onchange="hitungTarif()">
-              <option value="B2B">B2B — Kargo Antar-Vendor</option>
-              <option value="B2C">B2C — Reguler Perorangan</option>
-            </select>
+      <section class="tracking-strip" aria-label="Lacak kiriman">
+        <div class="tracking-intro">
+          <span class="tracking-icon" aria-hidden="true">⌕</span>
+          <div><strong>Ke mana kiriman Anda?</strong><small>Masukkan nomor resi, Surat Jalan, atau PO</small></div>
+        </div>
+        <div class="tracking-form">
+          <input type="text" id="heroInput" class="input" placeholder="Contoh: DAN-B2B-2611-0001" aria-label="Nomor resi, Surat Jalan, atau PO">
+          <button class="btn" onclick="lacakDariHero()">Lacak sekarang <span aria-hidden="true">→</span></button>
+        </div>
+      </section>
+
+      <section class="landing-section" id="landing-services">
+        <div class="section-heading">
+          <div><span class="section-kicker">LAYANAN KAMI</span><h2>Satu jaringan, dua kebutuhan.</h2></div>
+          <p>Dari pengiriman antargudang berskala besar hingga paket untuk pelanggan Anda.</p>
+        </div>
+        <div class="service-grid">
+          <article class="service-card service-b2b">
+            <div class="service-icon" aria-hidden="true">▦</div>
+            <span class="service-label">UNTUK BISNIS</span>
+            <h3>Kargo B2B</h3>
+            <p>Pengiriman antargudang dan antar-vendor dengan detail muatan serta referensi Surat Jalan dan PO.</p>
+            <button class="text-action" onclick="bukaTab('track')">Lacak kargo <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="service-card service-b2c">
+            <div class="service-icon" aria-hidden="true">↗</div>
+            <span class="service-label">UNTUK PELANGGAN</span>
+            <h3>Paket B2C</h3>
+            <p>Pelacakan paket ritel dengan nomor resi dan tampilan status yang mudah dipahami.</p>
+            <button class="text-action" onclick="bukaTab('track')">Lacak paket <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="service-card service-tools">
+            <div class="service-icon" aria-hidden="true">▤</div>
+            <span class="service-label">ALUR KERJA TERHUBUNG</span>
+            <h3>Kontrol operasional</h3>
+            <p>Kelola data melalui portal admin, sinkronisasi Excel, dan cetak resi dari satu aplikasi.</p>
+            <button class="text-action" onclick="bukaTab('admin')">Buka portal admin <span aria-hidden="true">→</span></button>
+          </article>
+        </div>
+      </section>
+
+      <section class="landing-workflow">
+        <div class="workflow-copy">
+          <span class="section-kicker">RINGKAS & TERINTEGRASI</span>
+          <h2>Informasi pengiriman, lebih mudah diikuti.</h2>
+          <p>Referensi yang biasa digunakan tim operasional tetap menjadi bagian dari alur digital.</p>
+        </div>
+        <div class="workflow-steps">
+          <div class="workflow-step"><span>01</span><div><strong>Input data</strong><small>Tambah kiriman atau impor data kerja Excel.</small></div></div>
+          <div class="workflow-step"><span>02</span><div><strong>Pantau status</strong><small>Cari menggunakan resi, Surat Jalan, atau PO.</small></div></div>
+          <div class="workflow-step"><span>03</span><div><strong>Siapkan dokumen</strong><small>Ekspor rekap dan cetak lembar kiriman.</small></div></div>
+        </div>
+      </section>
+
+      <section class="landing-calculator">
+        <div class="calculator-copy">
+          <span class="section-kicker">RENCANAKAN PENGIRIMAN</span>
+          <h2>Perkirakan kebutuhan armada.</h2>
+          <p>Simulasikan estimasi berdasarkan berat, volume, layanan, dan rute.</p>
+          <div class="calculator-disclaimer">Estimasi untuk simulasi dan dapat berbeda dari tarif aktual.</div>
+        </div>
+        <div class="calculator-card">
+          <div class="grid-2" style="margin-bottom:12px;">
+            <div>
+              <label class="lbl-input" for="cTipe">Jenis layanan</label>
+              <select id="cTipe" onchange="hitungTarif()">
+                <option value="B2B">B2B — Kargo antar-vendor</option>
+                <option value="B2C">B2C — Paket ritel</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl-input" for="cRute">Rute pengiriman</label>
+              <select id="cRute" onchange="hitungTarif()">
+                <option value="1">Dalam kota / Jabodetabek</option>
+                <option value="1.8">Antar kota (Jawa / Sumatera)</option>
+                <option value="2.6">Antar pulau</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl-input" for="cBerat">Total berat (Kg)</label>
+              <input type="number" id="cBerat" class="input" value="500" min="0" oninput="hitungTarif()">
+            </div>
+            <div>
+              <label class="lbl-input" for="cCbm">Volume (CBM / m³)</label>
+              <input type="number" id="cCbm" class="input" value="2.5" min="0" step="0.5" oninput="hitungTarif()">
+            </div>
           </div>
-          <div>
-            <label class="lbl-input">Rute Pengiriman</label>
-            <select id="cRute" onchange="hitungTarif()">
-              <option value="1">Dalam Kota / Jabodetabek</option>
-              <option value="1.8">Antar Kota (Jawa / Sumatera)</option>
-              <option value="2.6">Antar Pulau</option>
-            </select>
-          </div>
-          <div>
-            <label class="lbl-input">Total Berat (Kg)</label>
-            <input type="number" id="cBerat" class="input" value="500" oninput="hitungTarif()">
-          </div>
-          <div>
-            <label class="lbl-input">Volume Kubikasi (CBM / m³)</label>
-            <input type="number" id="cCbm" class="input" value="2.5" step="0.5" oninput="hitungTarif()">
+          <div class="estimate-result">
+            <div><span class="lbl">ESTIMASI BIAYA</span><div class="val" id="cHasilHarga">Rp 1.100.000</div></div>
+            <div class="estimate-divider"></div>
+            <div><span class="lbl">REKOMENDASI ARMADA</span><div class="estimate-vehicle" id="cHasilArmada">Armada: Truk CDE Engkel Box (2.2 Ton)</div></div>
           </div>
         </div>
-        <div class="info-box highlight">
-          <div class="lbl">Estimasi Tarif & Rekomendasi Armada</div>
-          <div class="val" id="cHasilHarga" style="font-size:20px; color:#c2410c;">Rp 1.100.000</div>
-          <div id="cHasilArmada" style="font-size:13px; font-weight:600; margin-top:2px;">Armada: Truk CDE Engkel Box (2.2 Ton)</div>
-        </div>
-      </div>
+      </section>
+
+      <footer class="landing-footer">
+        <button class="brand footer-brand" onclick="bukaTab('home')"><span class="brand-mark" aria-hidden="true">D</span><span class="brand-copy"><strong>D'ANTAR</strong><small>LOGISTIK</small></span></button>
+        <p>Solusi pelacakan pengiriman untuk kebutuhan bisnis dan personal.</p>
+        <button class="footer-track" onclick="bukaTab('track')">Lacak kiriman <span aria-hidden="true">→</span></button>
+      </footer>
     </section>
 
     <!-- 2. LACAK KIRIMAN -->
