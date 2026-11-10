@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>D'Antar Logistik — Sistem Pelacakan B2B & B2C</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <header class="navbar no-print">
+    <div class="nav-top">
+      <div class="brand" onclick="bukaTab('home')"><span>D'ANTAR</span> Logistik B2B & B2C</div>
+      <div style="font-size:12px; color:#94a3b8;">Docker + Flask + PostgreSQL</div>
+    </div>
+    <div class="nav-tabs">
+      <button class="tab-btn active" id="btn-home" onclick="bukaTab('home')">Beranda</button>
+      <button class="tab-btn" id="btn-track" onclick="bukaTab('track')">Lacak Kiriman</button>
+      <button class="tab-btn" id="btn-print" onclick="bukaTab('print')">Cetak Resi</button>
+      <button class="tab-btn" id="btn-admin" onclick="bukaTab('admin')">Portal Admin (Excel)</button>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- 1. BERANDA -->
+    <section id="view-home" class="view active">
+      <div class="hero">
+        <span class="hero-badge">Ekspedisi Hybrid Kargo Vendor (B2B) & Ritel (B2C)</span>
+        <h1>Pengiriman Kargo Antar-Gudang & Paket Ritel Terintegrasi</h1>
+        <p>Lacak posisi muatan dengan Nomor Resi, Nomor Surat Jalan (DO), atau Nomor PO. Dilengkapi verifikasi stempel basah POD dan sinkronisasi langsung dengan Microsoft Excel.</p>
+        <div class="quick-box">
+          <div style="font-size:11px; font-weight:700; margin-bottom:6px;">LACAK CEPAT (NO. RESI / SURAT JALAN / PO)</div>
+          <div class="input-row">
+            <input type="text" id="heroInput" class="input" placeholder="Contoh: DAN-B2B-2611-0001 atau SJ-2026-881">
+            <button class="btn" onclick="lacakDariHero()">Lacak Sekarang</button>
+          </div>
+          <div class="chips">
+            <span class="chip" onclick="pilihContoh('DAN-B2B-2611-0001')">DAN-B2B-2611-0001 (B2B)</span>
+            <span class="chip" onclick="pilihContoh('SJ-2026-882')">SJ-2026-882 (No. SJ)</span>
+            <span class="chip" onclick="pilihContoh('DAN-B2C-2611-0101')">DAN-B2C-2611-0101 (B2C)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Kalkulator Estimasi Tarif & Rekomendasi Armada</h3>
+        <p class="sub">Perhitungan otomatis berdasarkan berat aktual (Kg) atau kubikasi (CBM)</p>
+        <div class="grid-2" style="margin-bottom:12px;">
+          <div>
+            <label class="lbl-input">Jenis Layanan</label>
+            <select id="cTipe" onchange="hitungTarif()">
+              <option value="B2B">B2B — Kargo Antar-Vendor</option>
+              <option value="B2C">B2C — Reguler Perorangan</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl-input">Rute Pengiriman</label>
+            <select id="cRute" onchange="hitungTarif()">
+              <option value="1">Dalam Kota / Jabodetabek</option>
+              <option value="1.8">Antar Kota (Jawa / Sumatera)</option>
+              <option value="2.6">Antar Pulau</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl-input">Total Berat (Kg)</label>
+            <input type="number" id="cBerat" class="input" value="500" oninput="hitungTarif()">
+          </div>
+          <div>
+            <label class="lbl-input">Volume Kubikasi (CBM / m³)</label>
+            <input type="number" id="cCbm" class="input" value="2.5" step="0.5" oninput="hitungTarif()">
+          </div>
+        </div>
+        <div class="info-box highlight">
+          <div class="lbl">Estimasi Tarif & Rekomendasi Armada</div>
+          <div class="val" id="cHasilHarga" style="font-size:20px; color:#c2410c;">Rp 1.100.000</div>
+          <div id="cHasilArmada" style="font-size:13px; font-weight:600; margin-top:2px;">Armada: Truk CDE Engkel Box (2.2 Ton)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. LACAK KIRIMAN -->
+    <section id="view-track" class="view">
+      <div class="card">
+        <h3>Lacak Status Pengiriman & Dokumen POD</h3>
+        <p class="sub">Mendukung pencarian multi-referensi: Nomor Resi, Nomor Surat Jalan (DO), atau Nomor PO</p>
+        <div class="input-row">
+          <input type="text" id="trackInput" class="input" placeholder="Masukkan No. Resi / No. SJ / PO...">
+          <button class="btn" onclick="prosesLacak()">Cari Kiriman</button>
+        </div>
+        <div class="chips">
+          <span class="chip" onclick="pilihContoh('DAN-B2B-2611-0001')">DAN-B2B-2611-0001</span>
+          <span class="chip" onclick="pilihContoh('SJ-2026-882')">SJ-2026-882</span>
+          <span class="chip" onclick="pilihContoh('DAN-B2C-2611-0101')">DAN-B2C-2611-0101</span>
+        </div>
+      </div>
+
+      <div id="hasilCard" class="card" style="display:none;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <span id="outTipeBadge" class="badge b-b2b">B2B KARGO</span>
+          <span id="outStatusBadge" class="badge b-ok">DELIVERED</span>
+        </div>
+        <h2 id="outResi" style="font-size:22px;">-</h2>
+        <p id="outRef" class="sub">-</p>
+
+        <div class="grid-2" style="margin-bottom:12px;">
+          <div class="info-box"><div class="lbl">Pengirim</div><div class="val" id="outPengirim">-</div></div>
+          <div class="info-box"><div class="lbl">Penerima</div><div class="val" id="outPenerima">-</div></div>
+          <div class="info-box"><div class="lbl">Muatan & Tonase</div><div class="val" id="outMuatan">-</div></div>
+          <div class="info-box"><div class="lbl">Armada / Kurir</div><div class="val" id="outArmada">-</div></div>
+        </div>
+
+        <div id="boxPodB2B" class="info-box pod-panel">
+          <div class="lbl" style="color:#1e40af;">Status Dokumen Surat Jalan Balikan (POD)</div>
+          <div class="val" id="outPod" style="color:#1e3a8a; margin-bottom:8px;">-</div>
+          <button class="btn btn-blue" onclick="bukaModal()">Lihat Scan Surat Jalan / Bukti POD</button>
+        </div>
+
+        <button class="btn btn-dark" style="margin-bottom:16px;" onclick="loncatKeCetak()">Cetak Resi / Label Koli Ini</button>
+
+        <h4 style="font-size:14px;">Riwayat Perjalanan Paket:</h4>
+        <ul id="outTimeline" class="timeline"></ul>
+      </div>
+    </section>
+
+    <!-- 3. CETAK RESI -->
+    <section id="view-print" class="view">
+      <div class="card no-print">
+        <h3>Generator Cetak Resi & Label Koli (QR Otomatis)</h3>
+        <div class="grid-2" style="margin:10px 0;">
+          <div>
+            <label class="lbl-input">Pilih Nomor Resi</label>
+            <select id="selResiCetak" onchange="renderCetakan()"></select>
+          </div>
+          <div>
+            <label class="lbl-input">Pilih Format Cetakan</label>
+            <select id="selFormatCetak" onchange="renderCetakan()">
+              <option value="AWB">AWB Kargo B2B + Kolom Stempel POD</option>
+              <option value="KOLI">Label Penanda Koli B2B (Koli 1 dari X)</option>
+              <option value="THERMAL">Stiker Thermal A6 (Reguler B2C)</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" onclick="window.print()">Cetak Sekarang / Simpan PDF</button>
+      </div>
+
+      <div id="areaCetak" class="resi-box"></div>
+    </section>
+
+    <!-- 4. PORTAL ADMIN (EXCEL) -->
+    <section id="view-admin" class="view">
+      <div class="card">
+        <h3>Sinkronisasi File Microsoft Excel (Pandas Engine)</h3>
+        <p class="sub">Unduh database ke Excel (.xlsx) atau unggah file kerja admin untuk memperbarui data otomatis (Upsert)</p>
+        <div style="margin-bottom:12px;">
+          <button class="btn btn-success" onclick="unduhExcelServer()">Unduh Master Excel dari Server (.xlsx)</button>
+        </div>
+        <div class="info-box">
+          <label class="lbl-input">Unggah File Excel (.xlsx) ke Database PostgreSQL:</label>
+          <input type="file" id="fileExcelInput" accept=".xlsx,.xls" onchange="unggahExcelServer(event)" style="margin-top:6px; width:100%;">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Buat Resi Baru (Auto-Generator Kode Resi)</h3>
+        <div class="grid-2" style="margin:10px 0;">
+          <select id="inTipe">
+            <option value="B2B">B2B (Kargo Antar-Vendor)</option>
+            <option value="B2C">B2C (Ritel Perorangan)</option>
+          </select>
+          <input type="text" id="inSJ" class="input" placeholder="No. Surat Jalan / PO (Opsional)">
+          <input type="text" id="inPengirim" class="input" placeholder="Nama Pengirim & Kota Asal">
+          <input type="text" id="inPenerima" class="input" placeholder="Nama Penerima & Kota Tujuan">
+          <input type="number" id="inKoli" class="input" placeholder="Jumlah Koli" value="10">
+          <input type="number" id="inBerat" class="input" placeholder="Total Berat (Kg)" value="250">
+        </div>
+        <button class="btn" onclick="buatResiServer()">Terbitkan Resi & Simpan ke Database</button>
+      </div>
+
+      <div class="card">
+        <h3>Database Pengiriman Aktif (<span id="jmlData">0</span> Resi)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>No. Resi</th>
+                <th>Tipe</th>
+                <th>No. SJ</th>
+                <th>Pengirim</th>
+                <th>Penerima</th>
+                <th>Muatan</th>
+                <th>Status</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tabelAdmin"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="modalPod" class="modal" onclick="tutupModal()">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <h3 id="judulModal" style="margin-bottom:10px;">Bukti Dokumen POD</h3>
+      <div id="isiModal" class="modal-body"></div>
+      <button class="btn btn-dark" onclick="tutupModal()">Tutup</button>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
