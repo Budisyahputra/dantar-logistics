@@ -26,7 +26,7 @@ async function muatSemuaData() {
     return true;
   } catch (err) {
     console.error("Gagal memuat data dari server:", err);
-    alert('Data admin gagal dimuat. Coba muat ulang halaman.');
+    showToast('Data admin gagal dimuat. Coba muat ulang halaman.', 'error', 'Gagal memuat data');
     return false;
   }
 }
@@ -94,7 +94,7 @@ async function bukaTab(id) {
       }
     } catch (err) {
       console.error('Gagal memverifikasi sesi admin:', err);
-      alert(`Tidak dapat memverifikasi sesi admin. ${err.message || 'Periksa koneksi ke server.'}`);
+      showToast(`Tidak dapat memverifikasi sesi admin. ${err.message || 'Periksa koneksi ke server.'}`, 'error', 'Sesi admin');
       return;
     }
     if (!dataAdminDimuat && !await muatSemuaData()) return;
@@ -126,7 +126,7 @@ function hitungTarif() {
 
 function lacakDariHero() {
   const v = document.getElementById('heroInput').value.trim();
-  if (!v) return alert('Ketik Nomor Resi atau Surat Jalan terlebih dahulu.');
+  if (!v) return showToast('Ketik nomor resi atau Surat Jalan terlebih dahulu.', 'warning', 'Nomor belum diisi');
   pilihContoh(v);
 }
 
@@ -171,7 +171,7 @@ async function prosesLacak() {
     const json = await res.json();
     if (!res.ok || !json.found) {
       card.style.display = 'none';
-      return alert(json.message || 'Data tidak ditemukan.');
+      return showToast(json.message || 'Data tidak ditemukan.', 'error', 'Kiriman tidak ditemukan');
     }
 
     const d = json.data;
@@ -186,7 +186,8 @@ async function prosesLacak() {
     updateStatusPelacakan(d.status);
     document.getElementById('outResi').innerText = d.resi;
   } catch (err) {
-    alert('Gagal menghubungi server pelacakan.');
+    console.error('Gagal menghubungi server pelacakan:', err);
+    showToast('Periksa koneksi Anda lalu coba lacak kembali.', 'error', 'Pelacakan gagal');
   }
 }
 
@@ -437,21 +438,28 @@ async function buatAkunKorporat(event) {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || 'Gagal membuat akun korporat.');
+      showToast(data.error || 'Gagal membuat akun korporat.', 'error', 'Akun gagal dibuat');
       return;
     }
     event.target.reset();
     await muatDaftarPerusahaan();
     renderTabel();
-    alert(`Akun perusahaan berhasil dibuat.\n\nPerusahaan: ${data.account.company_name}\nUsername: ${data.account.username}\n\nSimpan password yang dimasukkan saat pembuatan dan berikan secara aman kepada perusahaan.`);
+    showAppDialog({
+      title: 'Akun perusahaan berhasil dibuat',
+      message: `Perusahaan: ${data.account.company_name}\nUsername: ${data.account.username}\n\nSimpan password yang dimasukkan saat pembuatan dan berikan secara aman kepada perusahaan.`,
+      type: 'success'
+    });
   } catch (error) {
     console.error('Gagal membuat akun perusahaan:', error);
-    alert('Tidak dapat menghubungi server untuk membuat akun perusahaan.');
+    showToast('Tidak dapat menghubungi server untuk membuat akun perusahaan.', 'error', 'Akun gagal dibuat');
   }
 }
 
 async function resetPasswordKorporat(companyId) {
-  if (!confirm('Buat password sementara baru? Password lama langsung tidak berlaku.')) return;
+  if (!await showConfirm(
+    'Password lama langsung tidak berlaku. Pastikan Anda siap menyampaikan password baru dengan aman.',
+    { title: 'Reset password perusahaan', confirmLabel: 'Reset password' }
+  )) return;
   try {
     const res = await fetch(`/api/companies/${companyId}/reset-password`, {
       method: 'POST',
@@ -459,13 +467,19 @@ async function resetPasswordKorporat(companyId) {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || 'Gagal mereset password perusahaan.');
+      showToast(data.error || 'Gagal mereset password perusahaan.', 'error', 'Reset gagal');
       return;
     }
-    alert(`Password sementara (hanya ditampilkan kali ini):\n\nUsername: ${data.username}\nPassword: ${data.temporary_password}\n\nBagikan melalui kanal aman.`);
+    showAppDialog({
+      title: 'Password sementara dibuat',
+      message: `Username: ${data.username}\nPassword: ${data.temporary_password}\n\nPassword ini hanya ditampilkan kali ini. Bagikan melalui kanal aman.`,
+      type: 'success',
+      confirmLabel: 'Selesai',
+      copyText: data.temporary_password
+    });
   } catch (error) {
     console.error('Gagal mereset password akun korporat:', error);
-    alert('Tidak dapat menghubungi server untuk mereset password.');
+    showToast('Tidak dapat menghubungi server untuk mereset password.', 'error', 'Reset gagal');
   }
 }
 
@@ -478,29 +492,39 @@ async function tautkanPerusahaan(shipmentId, companyId) {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || 'Gagal menautkan kiriman ke perusahaan.');
+      showToast(data.error || 'Gagal menautkan kiriman ke perusahaan.', 'error', 'Tautan gagal');
       await muatSemuaData();
       return;
     }
     await muatSemuaData();
+    showToast(data.message || 'Kiriman berhasil ditautkan ke perusahaan.', 'success', 'Kiriman diperbarui');
   } catch (error) {
     console.error('Gagal menautkan kiriman ke perusahaan:', error);
-    alert('Tidak dapat menghubungi server untuk menautkan kiriman.');
+    showToast('Tidak dapat menghubungi server untuk menautkan kiriman.', 'error', 'Tautan gagal');
   }
 }
 
 async function terbitkanKodeAkses(shipmentId) {
-  if (!confirm('Terbitkan kode baru? Kode lama akan langsung tidak berlaku.')) return;
+  if (!await showConfirm(
+    'Kode akses lama langsung tidak berlaku. Pastikan Anda dapat membagikan kode baru kepada penerima.',
+    { title: 'Terbitkan kode akses baru', confirmLabel: 'Terbitkan kode' }
+  )) return;
   const res = await fetch(`/api/shipments/${shipmentId}/tracking-code`, {
     method: 'POST',
     headers: { 'X-CSRF-Token': csrfToken }
   });
   const data = await res.json();
   if (!res.ok) {
-    alert(data.error || 'Gagal menerbitkan kode akses.');
+    showToast(data.error || 'Gagal menerbitkan kode akses.', 'error', 'Kode gagal dibuat');
     return;
   }
-  alert(`Kode akses untuk ${data.resi} (tampilkan/simpan sekarang; tidak dapat dilihat lagi):\n\n${data.tracking_code}\n\nBagikan hanya kepada penerima yang berhak.`);
+  showAppDialog({
+    title: 'Kode akses berhasil dibuat',
+    message: `Resi: ${data.resi}\nKode: ${data.tracking_code}\n\nKode ini hanya ditampilkan kali ini. Bagikan hanya kepada penerima yang berhak.`,
+    type: 'success',
+    confirmLabel: 'Selesai',
+    copyText: data.tracking_code
+  });
 }
 
 async function buatResiServer() {
@@ -515,10 +539,10 @@ async function buatResiServer() {
     berat: parseFloat(document.getElementById('inBerat').value) || 10
   };
   if (!payload.pengirim || !payload.penerima) {
-    return alert('Mohon isi Nama Pengirim dan Penerima.');
+    return showToast('Mohon isi nama pengirim dan penerima.', 'warning', 'Data belum lengkap');
   }
   if (tipe === 'B2B' && !payload.company_id) {
-    return alert('Pilih akun perusahaan untuk kiriman B2B.');
+    return showToast('Pilih akun perusahaan untuk kiriman B2B.', 'warning', 'Perusahaan belum dipilih');
   }
 
   const res = await fetch('/api/shipments', {
@@ -530,12 +554,18 @@ async function buatResiServer() {
   if (res.ok) {
     await muatSemuaData();
     if (tipe === 'B2C') {
-      alert(`Resi baru berhasil disimpan: ${json.data.resi}\n\nKode akses detail (tampilkan/simpan sekarang; tidak dapat dilihat lagi):\n${json.tracking_code}\n\nBagikan kode ini hanya kepada penerima yang berhak.`);
+      showAppDialog({
+        title: 'Resi B2C berhasil dibuat',
+        message: `Resi: ${json.data.resi}\nKode akses: ${json.tracking_code}\n\nKode hanya ditampilkan kali ini. Simpan dan bagikan secara aman kepada penerima.`,
+        type: 'success',
+        confirmLabel: 'Selesai',
+        copyText: json.tracking_code
+      });
     } else {
-      alert(`Resi B2B ${json.data.resi} berhasil ditautkan ke akun perusahaan.`);
+      showToast(`Resi ${json.data.resi} berhasil ditautkan ke akun perusahaan.`, 'success', 'Resi B2B dibuat');
     }
   } else {
-    alert(json.error || 'Gagal membuat resi.');
+    showToast(json.error || 'Gagal membuat resi.', 'error', 'Resi gagal dibuat');
   }
 }
 
@@ -553,7 +583,7 @@ async function logoutAdmin() {
     dataAdminDimuat = false;
     window.location.assign('/');
   } else {
-    alert('Sesi tidak dapat ditutup. Muat ulang halaman dan coba lagi.');
+    showToast('Sesi tidak dapat ditutup. Muat ulang halaman dan coba lagi.', 'error', 'Logout gagal');
   }
 }
 
@@ -571,9 +601,9 @@ async function unggahExcelServer(e) {
   const json = await res.json();
   if (res.ok) {
     await muatSemuaData();
-    alert(json.message);
+    showToast(json.message, 'success', 'Sinkronisasi selesai');
   } else {
-    alert(json.error || 'Gagal mengunggah file Excel.');
+    showToast(json.error || 'Gagal mengunggah file Excel.', 'error', 'Impor gagal');
   }
 }
 

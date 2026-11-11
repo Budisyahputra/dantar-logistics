@@ -39,6 +39,20 @@
     </section>
     <p class="corporate-footnote">Ada data yang tidak sesuai? Hubungi administrator D'Antar Logistik.</p>
   </main>
+  <div id="notificationRegion" class="notification-region" aria-live="polite" aria-label="Notifikasi"></div>
+  <div id="appDialog" class="app-dialog-backdrop" role="presentation" hidden onclick="if (event.target === this) closeAppDialog(false)">
+    <section class="app-dialog-card" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogMessage">
+      <span id="appDialogIcon" class="dialog-icon dialog-info" aria-hidden="true">i</span>
+      <h2 id="appDialogTitle">Notifikasi</h2>
+      <p id="appDialogMessage"></p>
+      <div class="app-dialog-actions">
+        <button id="appDialogCopy" class="dialog-copy" type="button" onclick="copyDialogText()" hidden>Salin</button>
+        <button id="appDialogCancel" class="dialog-cancel" type="button" onclick="closeAppDialog(false)" hidden>Batal</button>
+        <button id="appDialogConfirm" class="dialog-confirm" type="button" onclick="closeAppDialog(true)">Mengerti</button>
+      </div>
+    </section>
+  </div>
+  <script src="/static/js/notifications.js"></script>
   <script src="/static/js/corporate.js"></script>
 </body>
 </html>

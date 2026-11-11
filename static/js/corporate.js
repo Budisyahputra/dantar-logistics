@@ -69,7 +69,7 @@ async function logoutCorporate() {
     window.location.assign('/corporate/login');
   } catch (error) {
     console.error('Gagal logout portal korporat:', error);
-    alert('Logout gagal. Coba muat ulang halaman.');
+    showToast('Logout gagal. Coba muat ulang halaman.', 'error', 'Logout gagal');
   }
 }
 
