@@ -229,6 +229,15 @@ th { background: #f1f5f9; font-weight: 700; }
   .landing-footer p { flex-basis: 100%; order: 3; }
 }
 .admin-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 0 0 14px; padding: 14px 18px; border: 1px solid #e8ebef; border-radius: 12px; background: #fff; }
+.tracking-privacy-note { margin-top: 14px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; color: #64748b; font-size: 11px; line-height: 1.7; }
+.tracking-code-form { margin-top: 18px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
+.tracking-code-form .input-row .btn { width: auto; }
+.tracking-code-message { min-height: 16px; margin-top: 7px; color: #64748b; font-size: 11px; }
+.protected-shipment { margin-top: 10px; padding-top: 15px; border-top: 1px solid #e2e8f0; }
+.protected-shipment-grid { margin-bottom: 12px; }
+.protected-references { margin-top: 10px; }
+.pod-stamp-preview { margin-top: 10px; padding: 8px; border: 2px solid #1e40af; color: #1e40af; font-weight: 800; text-align: center; white-space: pre-line; }
+.access-code-action { margin-left: 5px; background: #fff7ed; color: #c2410c; }
 .admin-toolbar > div { display: grid; gap: 3px; }
 .admin-toolbar strong { font-size: 13px; }
 .admin-logout { border: 1px solid #fed7aa; border-radius: 8px; padding: 8px 12px; background: #fff7ed; color: #c2410c; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
@@ -259,4 +268,113 @@ th { background: #f1f5f9; font-weight: 700; }
   .login-shell { padding-top: 3vh; }
   .login-card { padding: 23px; }
   .admin-toolbar { padding: 12px; }
+}
+.tracking-page-intro { margin: 8px 8px 20px; }
+.tracking-page-intro h1 { margin-top: 7px; font-size: clamp(26px, 4vw, 36px); letter-spacing: -.045em; }
+.tracking-page-intro p { margin-top: 6px; color: #64748b; font-size: 13px; }
+.tracking-search-card { padding: 22px; border-radius: 14px; box-shadow: 0 8px 24px rgba(15,23,42,.035); }
+.tracking-search-card .lbl-input { margin-bottom: 8px; color: #334155; font-size: 11px; }
+.tracking-search-row { flex-wrap: nowrap; }
+.tracking-search-row .input { min-width: 0; height: 46px; }
+.tracking-search-row .btn { flex: 0 0 auto; width: auto; min-width: 160px; height: 46px; }
+.tracking-search-row .btn span { margin-right: 5px; font-size: 17px; vertical-align: -1px; }
+.tracking-search-hint { margin-top: 8px; color: #64748b; font-size: 10px; }
+.tracking-examples { margin-top: 14px; }
+.tracking-examples .chip { padding: 6px 10px; color: #475569; }
+.tracking-examples .chip:hover { border-color: #fdba74; background: #fff7ed; color: #c2410c; }
+.tracking-result { max-width: 100%; margin-top: 20px; padding: 0; overflow: hidden; border-radius: 15px; box-shadow: 0 12px 30px rgba(15,23,42,.06); }
+.tracking-result-top { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 24px; }
+.tracking-reference { display: grid; justify-items: start; gap: 7px; }
+.tracking-reference .badge { padding: 5px 10px; font-size: 9px; letter-spacing: .04em; }
+.tracking-reference-label { color: #64748b; font-size: 9px; font-weight: 800; letter-spacing: .13em; }
+.tracking-reference h2 { font-size: clamp(20px, 3vw, 27px); line-height: 1.15; letter-spacing: -.035em; overflow-wrap: anywhere; }
+.tracking-current-status { display: flex; align-items: center; gap: 12px; min-width: 215px; padding: 14px 18px; border: 1px solid #bbf7d0; border-radius: 12px; background: #f0fdf4; }
+.status-icon { width: 42px; height: 42px; display: grid; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #dcfce7; color: #15803d; font-size: 22px; font-weight: 900; }
+.status-content { display: grid; justify-items: start; gap: 4px; }
+.status-content .badge { padding: 0; background: transparent; color: #166534; font-size: 17px; font-weight: 850; }
+.shipment-progress { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 20px 24px 23px; border-top: 1px solid #eef0f3; border-bottom: 1px solid #eef0f3; background: #fafbfc; list-style: none; }
+.progress-step { position: relative; display: flex; align-items: center; gap: 9px; color: #94a3b8; font-size: 10px; font-weight: 700; }
+.progress-step:not(:last-child)::after { content: ""; position: absolute; z-index: 0; top: 50%; left: 28px; right: 0; height: 2px; transform: translateY(-50%); background: #e2e8f0; }
+.progress-dot { position: relative; z-index: 1; width: 27px; height: 27px; display: grid; flex: 0 0 auto; place-items: center; border: 2px solid #e2e8f0; border-radius: 50%; background: white; color: #94a3b8; font-size: 9px; }
+.progress-step.is-complete,.progress-step.is-current { color: #334155; }
+.progress-step.is-complete .progress-dot { border-color: #16a34a; background: #16a34a; color: white; }
+.progress-step.is-current .progress-dot { border-color: var(--primary); background: #fff7ed; color: var(--primary-dark); box-shadow: 0 0 0 4px rgba(234,88,12,.1); }
+.progress-step.is-complete:not(:last-child)::after { background: #22c55e; }
+.shipment-progress.is-delivered .progress-step.is-current .progress-dot { border-color: #16a34a; background: #16a34a; color: white; }
+.shipment-progress.is-in-transit .progress-step.is-current .progress-dot { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+.tracking-current-status:has(.b-transit) { border-color: #bfdbfe; background: #eff6ff; }
+.tracking-current-status:has(.b-transit) .status-icon { background: #dbeafe; color: #1d4ed8; }
+.tracking-current-status:has(.b-transit) .status-content .badge { color: #1d4ed8; }
+.tracking-current-status:has(.b-wait) { border-color: #fde68a; background: #fffbeb; }
+.tracking-current-status:has(.b-wait) .status-icon { background: #fef3c7; color: #b45309; }
+.tracking-current-status:has(.b-wait) .status-content .badge { color: #92400e; }
+.b-transit { background: #dbeafe; color: #1d4ed8; }
+.tracking-result .tracking-privacy-note { margin: 18px 24px 0; border-color: #e2e8f0; background: #f8fafc; }
+.privacy-lock { margin-right: 6px; color: #64748b; font-size: 9px; }
+.tracking-result .tracking-code-form { margin: 17px 24px 0; padding: 0; border: 0; }
+.tracking-code-form .lbl-input { margin-bottom: 7px; color: #334155; font-size: 10px; }
+.tracking-code-form .input { height: 42px; font-size: 12px; }
+.tracking-code-form .input-row .btn { min-width: 126px; }
+.tracking-result .protected-shipment { margin: 12px 24px 24px; }
+@media (max-width: 600px) {
+  .tracking-page-intro { margin: 4px 4px 15px; }
+  .tracking-search-card { padding: 16px; }
+  .tracking-search-row { flex-direction: column; }
+  .tracking-search-row .btn { width: 100%; }
+  .tracking-result-top { align-items: stretch; flex-direction: column; gap: 15px; padding: 18px; }
+  .tracking-current-status { min-width: 0; padding: 11px 13px; }
+  .shipment-progress { padding: 17px 12px; }
+  .progress-step { align-items: flex-start; flex-direction: column; gap: 6px; font-size: 9px; }
+  .progress-step:not(:last-child)::after { top: 13px; left: 31px; }
+  .tracking-result .tracking-privacy-note { margin: 14px 14px 0; }
+  .tracking-result .tracking-code-form { margin: 15px 14px 0; }
+  .tracking-code-form .input-row .btn { width: 100%; }
+  .tracking-result .protected-shipment { margin: 12px 14px 18px; }
+}
+.nav-corporate { flex: 0 0 auto; color: #475569; font-size: 11px; font-weight: 750; text-decoration: none; white-space: nowrap; }
+.nav-corporate:hover { color: var(--primary-dark); }
+.corporate-account-form { display: grid; grid-template-columns: 1.3fr 1fr 1.2fr auto; gap: 8px; align-items: center; margin-bottom: 12px; }
+.corporate-account-form .input { min-width: 0; font-size: 11px; }
+.corporate-account-form .btn { width: auto; white-space: nowrap; font-size: 11px; }
+.shipment-company-select { max-width: 175px; min-width: 140px; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 7px; background: white; color: #334155; font: inherit; font-size: 10px; }
+.corporate-page { min-height: 100vh; padding-bottom: 40px; }
+.corporate-navbar { position: sticky; }
+.corporate-nav-label { flex: 1; color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .12em; text-align: center; }
+.corporate-container { max-width: 1120px; margin: 0 auto; padding: 42px 18px; }
+.corporate-welcome { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 24px; }
+.corporate-welcome h1 { margin-top: 8px; font-size: clamp(26px, 4vw, 36px); letter-spacing: -.045em; }
+.corporate-welcome h1 span { color: var(--primary-dark); }
+.corporate-welcome p { margin-top: 7px; color: #64748b; font-size: 12px; }
+.corporate-summary { display: flex; align-items: center; gap: 12px; min-width: 190px; padding: 14px 17px; border: 1px solid #fed7aa; border-radius: 12px; background: #fff7ed; }
+.corporate-summary-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: white; color: var(--primary); font-size: 20px; }
+.corporate-summary strong,.corporate-summary small { display: block; }
+.corporate-summary strong { font-size: 20px; }
+.corporate-summary small { color: #64748b; font-size: 9px; }
+.corporate-table-card { padding: 20px; border-radius: 14px; }
+.corporate-table-heading { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+.corporate-table-heading h2 { font-size: 16px; }
+.corporate-table-heading p { margin-top: 4px; color: #64748b; font-size: 10px; }
+.corporate-refresh { padding: 8px 11px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; color: #334155; font: inherit; font-size: 10px; font-weight: 750; cursor: pointer; }
+.corporate-refresh:hover { border-color: #fdba74; color: var(--primary-dark); }
+.corporate-message { margin-top: 14px; color: #64748b; font-size: 11px; }
+.corporate-table { margin-top: 10px; }
+.corporate-table th { color: #475569; font-size: 9px; text-transform: uppercase; letter-spacing: .06em; }
+.corporate-table td { font-size: 10px; }
+.corporate-footnote { margin-top: 14px; color: #94a3b8; font-size: 10px; text-align: center; }
+@media (max-width: 900px) {
+  .corporate-account-form { grid-template-columns: 1fr 1fr; }
+  .corporate-account-form .btn { width: 100%; }
+}
+@media (max-width: 700px) {
+  .nav-corporate { order: 4; flex-basis: 100%; text-align: center; padding-bottom: 3px; }
+  .corporate-container { padding: 26px 13px; }
+  .corporate-welcome { align-items: stretch; flex-direction: column; }
+  .corporate-summary { min-width: 0; }
+  .corporate-table-card { padding: 14px; }
+}
+@media (max-width: 480px) {
+  .corporate-account-form { grid-template-columns: 1fr; }
+  .corporate-nav-label { font-size: 8px; }
+  .corporate-table-heading { align-items: flex-start; }
+  .corporate-table th,.corporate-table td { padding: 8px; }
 }

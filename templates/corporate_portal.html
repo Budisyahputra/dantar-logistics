@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>Pengiriman Perusahaan — D'Antar Logistik</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="corporate-page">
+  <header class="navbar corporate-navbar">
+    <div class="nav-top">
+      <a class="brand" href="/" aria-label="D'Antar Logistik, beranda">
+        <span class="brand-mark" aria-hidden="true">D</span>
+        <span class="brand-copy"><strong>D'ANTAR</strong><small>LOGISTIK</small></span>
+      </a>
+      <div class="corporate-nav-label">PORTAL KORPORAT B2B</div>
+      <button class="admin-logout" type="button" onclick="logoutCorporate()">Keluar <span aria-hidden="true">↗</span></button>
+    </div>
+  </header>
+  <main class="corporate-container">
+    <section class="corporate-welcome">
+      <div>
+        <span class="section-kicker">DASHBOARD PENGIRIMAN</span>
+        <h1>Selamat datang, <span>{{ company_name }}</span></h1>
+        <p>Lihat status dan detail kiriman B2B yang terdaftar untuk perusahaan Anda.</p>
+      </div>
+      <div class="corporate-summary"><span class="corporate-summary-icon" aria-hidden="true">▦</span><div><strong id="corporateShipmentCount">—</strong><small>Kiriman terdaftar</small></div></div>
+    </section>
+    <section class="card corporate-table-card">
+      <div class="corporate-table-heading"><div><h2>Daftar kiriman</h2><p>Status pengiriman perusahaan Anda.</p></div><button class="corporate-refresh" type="button" onclick="loadCorporateShipments()">Muat ulang</button></div>
+      <p id="corporateMessage" class="corporate-message" role="status">Memuat daftar kiriman...</p>
+      <div class="table-wrap">
+        <table class="corporate-table">
+          <thead><tr><th>Nomor resi</th><th>No. SJ</th><th>No. PO</th><th>Penerima</th><th>Muatan</th><th>Status</th><th>Status POD</th></tr></thead>
+          <tbody id="corporateShipments"></tbody>
+        </table>
+      </div>
+    </section>
+    <p class="corporate-footnote">Ada data yang tidak sesuai? Hubungi administrator D'Antar Logistik.</p>
+  </main>
+  <script src="/static/js/corporate.js"></script>
+</body>
+</html>

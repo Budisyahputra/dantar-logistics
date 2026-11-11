@@ -20,6 +20,7 @@
         <button class="tab-btn" id="btn-print" onclick="bukaTab('print')">Cetak Resi</button>
         <button class="tab-btn" id="btn-admin" onclick="bukaTab('admin')">Portal Admin</button>
       </nav>
+      <a class="nav-corporate" href="/corporate/login">Portal Korporat</a>
       <button class="nav-cta" onclick="bukaTab('track')">Lacak paket <span aria-hidden="true">↗</span></button>
     </div>
   </header>
@@ -167,45 +168,75 @@
 
     <!-- 2. LACAK KIRIMAN -->
     <section id="view-track" class="view">
-      <div class="card">
-        <h3>Lacak Status Pengiriman & Dokumen POD</h3>
-        <p class="sub">Mendukung pencarian multi-referensi: Nomor Resi, Nomor Surat Jalan (DO), atau Nomor PO</p>
-        <div class="input-row">
-          <input type="text" id="trackInput" class="input" placeholder="Masukkan No. Resi / No. SJ / PO...">
-          <button class="btn" onclick="prosesLacak()">Cari Kiriman</button>
+      <div class="tracking-page-intro">
+        <span class="section-kicker">PELACAKAN PENGIRIMAN</span>
+        <h1>Lacak kiriman Anda.</h1>
+        <p>Pantau status dengan nomor resi, Surat Jalan, atau Purchase Order.</p>
+      </div>
+      <div class="card tracking-search-card">
+        <label class="lbl-input" for="trackInput">Nomor resi atau referensi pengiriman</label>
+        <div class="input-row tracking-search-row">
+          <input type="text" id="trackInput" class="input" placeholder="Contoh: DAN-B2B-2611-0001">
+          <button class="btn" onclick="prosesLacak()"><span aria-hidden="true">⌕</span> Lacak kiriman</button>
         </div>
-        <div class="chips">
-          <span class="chip" onclick="pilihContoh('DAN-B2B-2611-0001')">DAN-B2B-2611-0001</span>
-          <span class="chip" onclick="pilihContoh('SJ-2026-882')">SJ-2026-882</span>
-          <span class="chip" onclick="pilihContoh('DAN-B2C-2611-0101')">DAN-B2C-2611-0101</span>
+        <div class="tracking-search-hint">Bisa menggunakan No. Resi, No. Surat Jalan (SJ/DO), atau No. PO.</div>
+        <div class="chips tracking-examples" aria-label="Contoh nomor pencarian">
+          <button class="chip" type="button" onclick="pilihContoh('DAN-B2B-2611-0001')">Contoh B2B</button>
+          <button class="chip" type="button" onclick="pilihContoh('SJ-2026-882')">Contoh No. SJ</button>
+          <button class="chip" type="button" onclick="pilihContoh('DAN-B2C-2611-0101')">Contoh B2C</button>
         </div>
       </div>
 
-      <div id="hasilCard" class="card" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-          <span id="outTipeBadge" class="badge b-b2b">B2B KARGO</span>
-          <span id="outStatusBadge" class="badge b-ok">DELIVERED</span>
-        </div>
-        <h2 id="outResi" style="font-size:22px;">-</h2>
-        <p id="outRef" class="sub">-</p>
-
-        <div class="grid-2" style="margin-bottom:12px;">
-          <div class="info-box"><div class="lbl">Pengirim</div><div class="val" id="outPengirim">-</div></div>
-          <div class="info-box"><div class="lbl">Penerima</div><div class="val" id="outPenerima">-</div></div>
-          <div class="info-box"><div class="lbl">Muatan & Tonase</div><div class="val" id="outMuatan">-</div></div>
-          <div class="info-box"><div class="lbl">Armada / Kurir</div><div class="val" id="outArmada">-</div></div>
-        </div>
-
-        <div id="boxPodB2B" class="info-box pod-panel">
-          <div class="lbl" style="color:#1e40af;">Status Dokumen Surat Jalan Balikan (POD)</div>
-          <div class="val" id="outPod" style="color:#1e3a8a; margin-bottom:8px;">-</div>
-          <button class="btn btn-blue" onclick="bukaModal()">Lihat Scan Surat Jalan / Bukti POD</button>
+      <div id="hasilCard" class="card tracking-result" style="display:none;">
+        <div class="tracking-result-top">
+          <div class="tracking-reference">
+            <span id="outTipeBadge" class="badge b-b2b">B2B KARGO</span>
+            <span class="tracking-reference-label">NOMOR KIRIMAN</span>
+            <h2 id="outResi">-</h2>
+          </div>
+          <div class="tracking-current-status">
+            <span class="status-icon" id="statusIcon" aria-hidden="true">✓</span>
+            <div class="status-content">
+              <span class="tracking-reference-label">STATUS TERKINI</span>
+              <span id="outStatusBadge" class="badge b-ok">Terkirim</span>
+            </div>
+          </div>
         </div>
 
-        <button class="btn btn-dark" style="margin-bottom:16px;" onclick="loncatKeCetak()">Cetak Resi / Label Koli Ini</button>
+        <ol class="shipment-progress" id="shipmentProgress" aria-label="Tahapan pengiriman">
+          <li class="progress-step"><span class="progress-dot">1</span><span>Resi dibuat</span></li>
+          <li class="progress-step"><span class="progress-dot">2</span><span>Dalam perjalanan</span></li>
+          <li class="progress-step"><span class="progress-dot">3</span><span>Terkirim</span></li>
+        </ol>
 
-        <h4 style="font-size:14px;">Riwayat Perjalanan Paket:</h4>
-        <ul id="outTimeline" class="timeline"></ul>
+        <div class="tracking-privacy-note">
+          <span class="privacy-lock" aria-hidden="true">◆</span>
+          Detail penerima, muatan, dan dokumen dilindungi. Masukkan kode akses untuk melihat detail pengiriman.
+        </div>
+        <div class="tracking-code-form">
+          <label class="lbl-input" for="trackingCodeInput">Kode akses kiriman</label>
+          <div class="input-row">
+            <input type="password" id="trackingCodeInput" class="input" autocomplete="off" maxlength="16" placeholder="Masukkan kode yang diberikan pengirim">
+            <button class="btn" type="button" onclick="verifikasiKodeAkses()">Buka detail</button>
+          </div>
+          <p id="trackingCodeMessage" class="tracking-code-message" role="status"></p>
+        </div>
+        <div id="detailTerlindungi" class="protected-shipment" style="display:none;">
+          <div class="grid-2 protected-shipment-grid">
+            <div class="info-box"><div class="lbl">Pengirim</div><div class="val" id="outPengirim">-</div></div>
+            <div class="info-box"><div class="lbl">Penerima</div><div class="val" id="outPenerima">-</div></div>
+            <div class="info-box"><div class="lbl">Muatan & Tonase</div><div class="val" id="outMuatan">-</div></div>
+            <div class="info-box"><div class="lbl">Armada / Kurir</div><div class="val" id="outArmada">-</div></div>
+          </div>
+          <p id="outRef" class="sub protected-references">-</p>
+          <div id="boxPodB2B" class="info-box pod-panel">
+            <div class="lbl">Status Dokumen Surat Jalan Balikan (POD)</div>
+            <div class="val" id="outPod" style="margin-bottom:8px;">-</div>
+            <button class="btn btn-blue" type="button" onclick="bukaModal()">Lihat informasi POD</button>
+          </div>
+          <h4 style="font-size:14px;">Riwayat Perjalanan:</h4>
+          <ul id="outTimeline" class="timeline"></ul>
+        </div>
       </div>
     </section>
 
@@ -240,6 +271,23 @@
         <button class="admin-logout" onclick="logoutAdmin()">Keluar <span aria-hidden="true">↗</span></button>
       </div>
       <div class="card">
+        <h3>Akun Korporat B2B</h3>
+        <p class="sub">Buat akun perusahaan. Setiap akun hanya dapat melihat kiriman B2B yang ditautkan kepadanya.</p>
+        <form class="corporate-account-form" onsubmit="buatAkunKorporat(event)">
+          <input type="text" id="companyNameInput" class="input" placeholder="Nama perusahaan" maxlength="160" required>
+          <input type="text" id="companyUsernameInput" class="input" placeholder="Username login" minlength="3" maxlength="50" pattern="[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}" required>
+          <input type="password" id="companyPasswordInput" class="input" placeholder="Password awal (minimal 12 karakter)" minlength="12" required>
+          <button class="btn" type="submit">Buat akun perusahaan</button>
+        </form>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Perusahaan</th><th>Username</th><th>Status</th><th>Aksi</th></tr></thead>
+            <tbody id="tabelPerusahaan"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
         <h3>Sinkronisasi File Microsoft Excel (Pandas Engine)</h3>
         <p class="sub">Unduh database ke Excel (.xlsx) atau unggah file kerja admin untuk memperbarui data otomatis (Upsert)</p>
         <div style="margin-bottom:12px;">
@@ -254,10 +302,14 @@
       <div class="card">
         <h3>Buat Resi Baru (Auto-Generator Kode Resi)</h3>
         <div class="grid-2" style="margin:10px 0;">
-          <select id="inTipe">
+          <select id="inTipe" onchange="toggleCompanyField()">
             <option value="B2B">B2B (Kargo Antar-Vendor)</option>
             <option value="B2C">B2C (Ritel Perorangan)</option>
           </select>
+          <div id="shipmentCompanyField">
+            <label class="lbl-input" for="shipmentCompanySelect">Perusahaan pemilik kiriman (wajib untuk B2B)</label>
+            <select id="shipmentCompanySelect"><option value="">Pilih perusahaan</option></select>
+          </div>
           <input type="text" id="inSJ" class="input" placeholder="No. Surat Jalan / PO (Opsional)">
           <input type="text" id="inPengirim" class="input" placeholder="Nama Pengirim & Kota Asal">
           <input type="text" id="inPenerima" class="input" placeholder="Nama Penerima & Kota Tujuan">
@@ -272,16 +324,7 @@
         <div class="table-wrap">
           <table>
             <thead>
-              <tr>
-                <th>No. Resi</th>
-                <th>Tipe</th>
-                <th>No. SJ</th>
-                <th>Pengirim</th>
-                <th>Penerima</th>
-                <th>Muatan</th>
-                <th>Status</th>
-                <th>Aksi</th>
-              </tr>
+              <tr><th>No. Resi</th><th>Tipe</th><th>No. SJ</th><th>Perusahaan</th><th>Pengirim</th><th>Penerima</th><th>Muatan</th><th>Status</th><th>Aksi</th></tr>
             </thead>
             <tbody id="tabelAdmin"></tbody>
           </table>

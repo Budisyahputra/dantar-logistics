@@ -1,11 +1,14 @@
 import os
 import io
 import hmac
+import hashlib
+import re
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, request, jsonify, render_template, send_file, redirect, session, url_for
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash, generate_password_hash
 import pandas as pd
 from dotenv import load_dotenv
 
@@ -37,6 +40,30 @@ def admin_required(view):
         if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
             csrf_token = request.headers.get('X-CSRF-Token', '')
             session_token = session.get('csrf_token', '')
+            if not csrf_token or not secure_equals(csrf_token, session_token):
+                return jsonify({"error": "Token keamanan tidak valid"}), 403
+
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def corporate_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        account_id = session.get('corporate_id')
+        account = db.session.get(CorporateAccount, account_id) if account_id else None
+        if (
+            not session.get('corporate_authenticated')
+            or not account
+            or not account.is_active
+            or session.get('corporate_auth_hash') != account.password_hash
+        ):
+            session.clear()
+            return jsonify({"error": "Login korporat diperlukan"}), 401
+
+        if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'}:
+            csrf_token = request.headers.get('X-CSRF-Token', '')
+            session_token = session.get('corporate_csrf_token', '')
             if not csrf_token or not secure_equals(csrf_token, session_token):
                 return jsonify({"error": "Token keamanan tidak valid"}), 403
 
@@ -86,6 +113,100 @@ class Shipment(db.Model):
             "pod": self.status_pod,
             "riwayat": [r.strip() for r in (self.riwayat or "").split(";") if r.strip()]
         }
+
+    def to_public_dict(self):
+        return {
+            "resi": self.resi,
+            "tipe": self.tipe,
+            "status": self.status,
+        }
+
+
+class CorporateAccount(db.Model):
+    __tablename__ = 'corporate_accounts'
+    id = db.Column(db.Integer, primary_key=True)
+    company_name = db.Column(db.String(160), nullable=False)
+    username = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class ShipmentCorporateLink(db.Model):
+    __tablename__ = 'shipment_corporate_links'
+    shipment_id = db.Column(db.Integer, db.ForeignKey('shipments.id'), primary_key=True)
+    company_id = db.Column(db.Integer, db.ForeignKey('corporate_accounts.id'), nullable=False, index=True)
+
+
+class CorporateLoginAttempt(db.Model):
+    __tablename__ = 'corporate_login_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    attempt_key = db.Column(db.String(64), nullable=False, index=True)
+    attempted_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+class ShipmentTrackingCode(db.Model):
+    __tablename__ = 'shipment_tracking_codes'
+    shipment_id = db.Column(db.Integer, db.ForeignKey('shipments.id'), primary_key=True)
+    code_hash = db.Column(db.String(64), nullable=False)
+
+
+class TrackingCodeAttempt(db.Model):
+    __tablename__ = 'tracking_code_attempts'
+    id = db.Column(db.Integer, primary_key=True)
+    shipment_id = db.Column(db.Integer, db.ForeignKey('shipments.id'), nullable=False, index=True)
+    requester_hash = db.Column(db.String(64), nullable=False, index=True)
+    attempted_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+
+def hash_tracking_code(code):
+    secret_key = app.config.get('SECRET_KEY')
+    if not secret_key or secret_key.startswith('replace-with-'):
+        raise RuntimeError('SECRET_KEY belum dikonfigurasi untuk kode akses pelacakan')
+    return hmac.new(
+        secret_key.encode('utf-8'),
+        code.strip().upper().encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def new_tracking_code():
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    return ''.join(secrets.choice(alphabet) for _ in range(16))
+
+
+def requester_hash():
+    secret_key = app.config.get('SECRET_KEY')
+    if not secret_key or secret_key.startswith('replace-with-'):
+        raise RuntimeError('SECRET_KEY belum dikonfigurasi untuk kode akses pelacakan')
+    address = request.remote_addr or 'unknown'
+    return hmac.new(
+        secret_key.encode('utf-8'),
+        address.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+
+
+def corporate_login_attempt_key(username):
+    secret_key = app.config.get('SECRET_KEY')
+    if not secret_key or secret_key.startswith('replace-with-'):
+        raise RuntimeError('SECRET_KEY belum dikonfigurasi untuk login korporat')
+    value = f"{username.strip().lower()}:{request.remote_addr or 'unknown'}"
+    return hmac.new(secret_key.encode('utf-8'), value.encode('utf-8'), hashlib.sha256).hexdigest()
+
+
+def store_tracking_code(shipment, code=None):
+    code = code or new_tracking_code()
+    access = db.session.get(ShipmentTrackingCode, shipment.id)
+    if access:
+        access.code_hash = hash_tracking_code(code)
+    else:
+        db.session.add(ShipmentTrackingCode(
+            shipment_id=shipment.id,
+            code_hash=hash_tracking_code(code)
+        ))
+    return code
+
 
 def seed_initial_data():
     if Shipment.query.count() == 0:
@@ -198,6 +319,148 @@ def admin_logout():
     session.clear()
     return jsonify({"message": "Logout berhasil"})
 
+@app.route('/corporate/login', methods=['GET', 'POST'])
+def corporate_login():
+    if not app.config.get('SECRET_KEY') or app.config['SECRET_KEY'].startswith('replace-with-'):
+        return render_template(
+            'corporate_login.html',
+            csrf_token='',
+            error='Login korporat belum tersedia. Atur SECRET_KEY pada environment.',
+            disabled=True
+        ), 503
+
+    if session.get('corporate_authenticated') and request.method == 'GET':
+        return redirect(url_for('corporate_portal'))
+
+    if request.method == 'POST':
+        csrf_token = request.form.get('csrf_token', '')
+        session_token = session.get('corporate_login_csrf_token', '')
+        if not csrf_token or not secure_equals(csrf_token, session_token):
+            return render_template(
+                'corporate_login.html',
+                csrf_token=session_token,
+                error='Sesi formulir tidak valid. Muat ulang halaman dan coba lagi.',
+                disabled=False
+            ), 400
+
+        username = request.form.get('username', '').strip().lower()
+        try:
+            attempt_key = corporate_login_attempt_key(username)
+        except RuntimeError as error:
+            return render_template(
+                'corporate_login.html',
+                csrf_token=session_token,
+                error=str(error),
+                disabled=True
+            ), 503
+
+        now = datetime.utcnow()
+        db.session.query(CorporateLoginAttempt).filter(
+            CorporateLoginAttempt.attempted_at < now - timedelta(days=1)
+        ).delete(synchronize_session=False)
+        recent_attempts = CorporateLoginAttempt.query.filter(
+            CorporateLoginAttempt.attempt_key == attempt_key,
+            CorporateLoginAttempt.attempted_at >= now - timedelta(minutes=15)
+        ).count()
+        if recent_attempts >= 5:
+            db.session.commit()
+            return render_template(
+                'corporate_login.html',
+                csrf_token=session_token,
+                error='Terlalu banyak percobaan masuk. Coba lagi dalam 15 menit.',
+                disabled=False
+            ), 429
+
+        account = CorporateAccount.query.filter_by(username=username, is_active=True).first()
+        if not account or not check_password_hash(account.password_hash, request.form.get('password', '')):
+            db.session.add(CorporateLoginAttempt(attempt_key=attempt_key, attempted_at=now))
+            db.session.commit()
+            session['corporate_login_csrf_token'] = secrets.token_urlsafe(32)
+            return render_template(
+                'corporate_login.html',
+                csrf_token=session['corporate_login_csrf_token'],
+                error='Nama pengguna atau kata sandi tidak sesuai.',
+                disabled=False
+            ), 401
+
+        session.clear()
+        session.permanent = True
+        session['corporate_authenticated'] = True
+        session['corporate_id'] = account.id
+        session['corporate_auth_hash'] = account.password_hash
+        session['corporate_csrf_token'] = secrets.token_urlsafe(32)
+        return redirect(url_for('corporate_portal'))
+
+    session['corporate_login_csrf_token'] = secrets.token_urlsafe(32)
+    return render_template(
+        'corporate_login.html',
+        csrf_token=session['corporate_login_csrf_token'],
+        error='',
+        disabled=False
+    )
+
+@app.route('/corporate')
+def corporate_portal():
+    account_id = session.get('corporate_id')
+    if not session.get('corporate_authenticated') or not account_id:
+        return redirect(url_for('corporate_login'))
+    account = db.session.get(CorporateAccount, account_id)
+    if (
+        not account
+        or not account.is_active
+        or session.get('corporate_auth_hash') != account.password_hash
+    ):
+        session.clear()
+        return redirect(url_for('corporate_login'))
+    return render_template('corporate_portal.html', company_name=account.company_name)
+
+@app.route('/corporate/logout', methods=['POST'])
+def corporate_logout():
+    if not session.get('corporate_authenticated'):
+        return jsonify({"error": "Login korporat diperlukan"}), 401
+    csrf_token = request.headers.get('X-CSRF-Token', '')
+    session_token = session.get('corporate_csrf_token', '')
+    if not csrf_token or not secure_equals(csrf_token, session_token):
+        return jsonify({"error": "Token keamanan tidak valid"}), 403
+    session.clear()
+    return jsonify({"message": "Logout berhasil"})
+
+@app.route('/api/corporate/session')
+def corporate_session():
+    account_id = session.get('corporate_id')
+    account = db.session.get(CorporateAccount, account_id) if account_id else None
+    authenticated = bool(
+        session.get('corporate_authenticated')
+        and account
+        and account.is_active
+        and session.get('corporate_auth_hash') == account.password_hash
+    )
+    if session.get('corporate_authenticated') and not authenticated:
+        session.clear()
+    return jsonify({
+        "authenticated": authenticated,
+        "company_name": account.company_name if authenticated else None,
+        "csrf_token": session.get('corporate_csrf_token') if authenticated else None
+    })
+
+@app.route('/api/corporate/shipments')
+@corporate_required
+def corporate_shipments():
+    account_id = session['corporate_id']
+    account = db.session.get(CorporateAccount, account_id)
+    if not account or not account.is_active:
+        session.clear()
+        return jsonify({"error": "Akun korporat tidak aktif"}), 401
+
+    shipments = Shipment.query.join(
+        ShipmentCorporateLink,
+        ShipmentCorporateLink.shipment_id == Shipment.id
+    ).filter(
+        ShipmentCorporateLink.company_id == account_id,
+        Shipment.tipe == 'B2B'
+    ).order_by(Shipment.id.desc()).all()
+    return jsonify([{"id": item.id, **item.to_dict()} for item in shipments])
+
 @app.route('/api/admin/session', methods=['GET'])
 def admin_session():
     authenticated = bool(session.get('admin_authenticated'))
@@ -210,7 +473,124 @@ def admin_session():
 @admin_required
 def get_all_shipments():
     items = Shipment.query.order_by(Shipment.id.desc()).all()
-    return jsonify([i.to_dict() for i in items])
+    links = {
+        link.shipment_id: link.company_id
+        for link in ShipmentCorporateLink.query.all()
+    }
+    companies = {
+        account.id: account.company_name
+        for account in CorporateAccount.query.all()
+    }
+    return jsonify([
+        {
+            **item.to_dict(),
+            "id": item.id,
+            "company_id": links.get(item.id),
+            "company_name": companies.get(links.get(item.id))
+        }
+        for item in items
+    ])
+
+@app.route('/api/companies', methods=['GET', 'POST'])
+@admin_required
+def manage_companies():
+    if request.method == 'GET':
+        return jsonify([
+            {
+                "id": account.id,
+                "company_name": account.company_name,
+                "username": account.username,
+                "is_active": account.is_active
+            }
+            for account in CorporateAccount.query.order_by(CorporateAccount.company_name).all()
+        ])
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "Format permintaan tidak valid."}), 400
+    company_name = str(body.get('company_name', '')).strip()
+    username = str(body.get('username', '')).strip().lower()
+    password = str(body.get('password', ''))
+    if not company_name or len(company_name) > 160:
+        return jsonify({"error": "Nama perusahaan wajib diisi (maksimal 160 karakter)."}), 400
+    if not re.fullmatch(r'[a-z0-9][a-z0-9._-]{2,49}', username):
+        return jsonify({"error": "Username 3-50 karakter: huruf kecil, angka, titik, garis bawah, atau tanda hubung."}), 400
+    if len(password) < 12:
+        return jsonify({"error": "Password awal harus minimal 12 karakter."}), 400
+    if CorporateAccount.query.filter(
+        db.func.lower(CorporateAccount.username) == username
+    ).first():
+        return jsonify({"error": "Username sudah digunakan."}), 409
+
+    account = CorporateAccount(
+        company_name=company_name,
+        username=username,
+        password_hash=generate_password_hash(password)
+    )
+    db.session.add(account)
+    db.session.commit()
+    return jsonify({
+        "message": "Akun korporat berhasil dibuat.",
+        "account": {
+            "id": account.id,
+            "company_name": account.company_name,
+            "username": account.username,
+            "is_active": account.is_active
+        }
+    }), 201
+
+@app.route('/api/companies/<int:company_id>/reset-password', methods=['POST'])
+@admin_required
+def reset_corporate_password(company_id):
+    account = db.session.get(CorporateAccount, company_id)
+    if not account:
+        return jsonify({"error": "Akun perusahaan tidak ditemukan."}), 404
+    temporary_password = secrets.token_urlsafe(18)
+    account.password_hash = generate_password_hash(temporary_password)
+    db.session.commit()
+    return jsonify({
+        "message": "Password baru hanya ditampilkan kali ini.",
+        "username": account.username,
+        "temporary_password": temporary_password
+    })
+
+@app.route('/api/admin/shipments/<int:shipment_id>/company', methods=['POST'])
+@admin_required
+def link_shipment_company(shipment_id):
+    shipment = db.session.get(Shipment, shipment_id)
+    if not shipment:
+        return jsonify({"error": "Kiriman tidak ditemukan."}), 404
+    if shipment.tipe != 'B2B':
+        return jsonify({"error": "Hanya kiriman B2B yang dapat ditautkan ke akun korporat."}), 400
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "Format permintaan tidak valid."}), 400
+    company_id = body.get('company_id')
+    link = db.session.get(ShipmentCorporateLink, shipment.id)
+    if company_id in (None, ''):
+        if link:
+            db.session.delete(link)
+        db.session.commit()
+        return jsonify({"message": "Tautan perusahaan dihapus.", "company_id": None})
+
+    try:
+        company_id = int(company_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Akun perusahaan tidak valid."}), 400
+    account = db.session.get(CorporateAccount, company_id)
+    if not account or not account.is_active:
+        return jsonify({"error": "Akun perusahaan tidak ditemukan atau tidak aktif."}), 404
+    if link:
+        link.company_id = account.id
+    else:
+        db.session.add(ShipmentCorporateLink(shipment_id=shipment.id, company_id=account.id))
+    db.session.commit()
+    return jsonify({
+        "message": "Kiriman berhasil ditautkan.",
+        "company_id": account.id,
+        "company_name": account.company_name
+    })
 
 @app.route('/api/track', methods=['GET'])
 def track_shipment():
@@ -227,13 +607,84 @@ def track_shipment():
     if not item:
         return jsonify({"found": False, "message": "Data Resi / Surat Jalan / PO tidak ditemukan"}), 404
 
-    return jsonify({"found": True, "data": item.to_dict()})
+    return jsonify({"found": True, "data": item.to_public_dict()})
+
+@app.route('/api/track/verify', methods=['POST'])
+def verify_tracking_code():
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "Format permintaan tidak valid"}), 400
+    q = str(body.get('q', '')).strip().upper()
+    code = str(body.get('code', '')).strip()
+    if not q or len(q) > 100 or len(code) != 16:
+        return jsonify({"error": "Nomor kiriman dan kode akses wajib diisi"}), 400
+
+    item = Shipment.query.filter(
+        (db.func.upper(Shipment.resi) == q) |
+        (db.func.upper(Shipment.no_sj) == q) |
+        (db.func.upper(Shipment.no_po) == q)
+    ).first()
+    if not item:
+        return jsonify({"error": "Kiriman atau kode akses tidak valid"}), 404
+    if item.tipe != 'B2C':
+        return jsonify({"error": "Detail B2B hanya tersedia melalui Portal Korporat."}), 403
+
+    if not app.config.get('SECRET_KEY') or app.config['SECRET_KEY'].startswith('replace-with-'):
+        return jsonify({"error": "Verifikasi kode akses belum dikonfigurasi"}), 503
+
+    now = datetime.utcnow()
+    window_start = now - timedelta(minutes=15)
+    remote_hash = requester_hash()
+    db.session.query(TrackingCodeAttempt).filter(
+        TrackingCodeAttempt.attempted_at < now - timedelta(days=1)
+    ).delete(synchronize_session=False)
+    attempt_count = TrackingCodeAttempt.query.filter(
+        TrackingCodeAttempt.requester_hash == remote_hash,
+        TrackingCodeAttempt.attempted_at >= window_start
+    ).count()
+    shipment_attempt_count = TrackingCodeAttempt.query.filter(
+        TrackingCodeAttempt.shipment_id == item.id,
+        TrackingCodeAttempt.requester_hash == remote_hash,
+        TrackingCodeAttempt.attempted_at >= window_start
+    ).count()
+    if attempt_count >= 10 or shipment_attempt_count >= 5:
+        db.session.commit()
+        return jsonify({"error": "Terlalu banyak percobaan. Coba lagi dalam 15 menit."}), 429
+
+    db.session.add(TrackingCodeAttempt(
+        shipment_id=item.id,
+        requester_hash=remote_hash,
+        attempted_at=now
+    ))
+    db.session.commit()
+
+    access = db.session.get(ShipmentTrackingCode, item.id)
+    if not access or not hmac.compare_digest(access.code_hash, hash_tracking_code(code)):
+        return jsonify({"error": "Kiriman atau kode akses tidak valid"}), 403
+
+    return jsonify({"verified": True, "data": item.to_dict()})
 
 @app.route('/api/shipments', methods=['POST'])
 @admin_required
 def create_shipment():
-    body = request.json or {}
+    if not app.config.get('SECRET_KEY') or app.config['SECRET_KEY'].startswith('replace-with-'):
+        return jsonify({"error": "SECRET_KEY belum dikonfigurasi untuk membuat kode akses"}), 503
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "Format permintaan tidak valid."}), 400
     tipe = str(body.get('tipe', 'B2B')).strip().upper()
+    if tipe not in {'B2B', 'B2C'}:
+        return jsonify({"error": "Tipe kiriman harus B2B atau B2C."}), 400
+    company = None
+    if tipe == 'B2B':
+        try:
+            company_id = int(body.get('company_id', 0))
+        except (TypeError, ValueError):
+            company_id = 0
+        company = db.session.get(CorporateAccount, company_id) if company_id else None
+        if not company or not company.is_active:
+            return jsonify({"error": "Pilih akun perusahaan aktif untuk kiriman B2B."}), 400
     yymm = datetime.now().strftime('%y%m')
     urut = Shipment.query.count() + 1
     kode_resi = f"DAN-{tipe}-{yymm}-{urut:04d}"
@@ -258,8 +709,38 @@ def create_shipment():
         riwayat=f"{waktu} - Resi {kode_resi} diterbitkan secara otomatis oleh sistem"
     )
     db.session.add(baru)
+    db.session.flush()
+    if company:
+        db.session.add(ShipmentCorporateLink(shipment_id=baru.id, company_id=company.id))
+    tracking_code = store_tracking_code(baru) if tipe == 'B2C' else None
     db.session.commit()
-    return jsonify({"message": "Resi berhasil dibuat", "data": baru.to_dict()}), 201
+    return jsonify({
+        "message": "Resi berhasil dibuat",
+        "data": baru.to_dict(),
+        "tracking_code": tracking_code
+    }), 201
+
+@app.route('/api/shipments/<int:shipment_id>/tracking-code', methods=['POST'])
+@admin_required
+def issue_tracking_code(shipment_id):
+    shipment = db.session.get(Shipment, shipment_id)
+    if not shipment:
+        return jsonify({"error": "Kiriman tidak ditemukan"}), 404
+    if shipment.tipe != 'B2C':
+        return jsonify({"error": "Kiriman B2B menggunakan akses Portal Korporat."}), 400
+
+    try:
+        code = store_tracking_code(shipment)
+        db.session.commit()
+    except RuntimeError as error:
+        db.session.rollback()
+        return jsonify({"error": str(error)}), 503
+
+    return jsonify({
+        "message": "Kode akses baru dibuat. Kode hanya ditampilkan kali ini.",
+        "resi": shipment.resi,
+        "tracking_code": code
+    })
 
 @app.route('/api/upload-excel', methods=['POST'])
 @admin_required

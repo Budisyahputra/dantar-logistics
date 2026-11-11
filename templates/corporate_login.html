@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>Portal Korporat — D'Antar Logistik</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="login-page">
+  <main class="login-shell">
+    <a class="login-back" href="/">← Kembali ke beranda</a>
+    <section class="login-card" aria-labelledby="corporate-login-title">
+      <a class="brand login-brand" href="/" aria-label="D'Antar Logistik">
+        <span class="brand-mark" aria-hidden="true">D</span>
+        <span class="brand-copy"><strong>D'ANTAR</strong><small>LOGISTIK</small></span>
+      </a>
+      <div class="login-heading">
+        <span class="section-kicker">PORTAL PELANGGAN B2B</span>
+        <h1 id="corporate-login-title">Akses pengiriman perusahaan.</h1>
+        <p>Masuk untuk melihat kiriman B2B yang ditautkan ke perusahaan Anda.</p>
+      </div>
+      {% if error %}<div class="login-alert" role="alert">{{ error }}</div>{% endif %}
+      <form method="post" action="{{ url_for('corporate_login') }}" class="login-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label for="username">Username perusahaan</label>
+        <input id="username" name="username" type="text" autocomplete="username" required autofocus {% if disabled %}disabled{% endif %}>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required {% if disabled %}disabled{% endif %}>
+        <button class="btn login-submit" type="submit" {% if disabled %}disabled{% endif %}>Masuk ke portal <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="login-security"><span aria-hidden="true">◇</span> Kiriman hanya terlihat oleh akun perusahaan yang ditautkan.</p>
+    </section>
+    <p class="login-footer">D'Antar Logistik <span>·</span> Portal pelanggan korporat</p>
+  </main>
+</body>
+</html>

@@ -2,6 +2,8 @@ let dbCache = [];
 let aktif = null;
 let csrfToken = '';
 let dataAdminDimuat = false;
+let lastTrackedQuery = '';
+let corporateAccounts = [];
 
 async function muatSemuaData() {
   try {
@@ -16,6 +18,7 @@ async function muatSemuaData() {
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error('Format data kiriman tidak valid');
     dbCache = data;
+    await muatDaftarPerusahaan();
     if (dbCache.length && !aktif) aktif = dbCache[0];
     dataAdminDimuat = true;
     renderTabel();
@@ -26,6 +29,49 @@ async function muatSemuaData() {
     alert('Data admin gagal dimuat. Coba muat ulang halaman.');
     return false;
   }
+}
+
+async function muatDaftarPerusahaan() {
+  const res = await fetch('/api/companies');
+  if (!res.ok) throw new Error(`Gagal memuat akun perusahaan (${res.status})`);
+  corporateAccounts = await res.json();
+  renderDaftarPerusahaan();
+  isiPilihanPerusahaan();
+}
+
+function isiPilihanPerusahaan() {
+  const select = document.getElementById('shipmentCompanySelect');
+  select.replaceChildren(new Option('Pilih perusahaan', ''));
+  corporateAccounts.filter(account => account.is_active).forEach(account => {
+    select.add(new Option(`${account.company_name} (${account.username})`, account.id));
+  });
+  toggleCompanyField();
+}
+
+function toggleCompanyField() {
+  const isB2B = document.getElementById('inTipe').value === 'B2B';
+  document.getElementById('shipmentCompanyField').hidden = !isB2B;
+}
+
+function renderDaftarPerusahaan() {
+  const table = document.getElementById('tabelPerusahaan');
+  table.replaceChildren();
+  corporateAccounts.forEach(account => {
+    const row = document.createElement('tr');
+    [account.company_name, account.username, account.is_active ? 'Aktif' : 'Nonaktif'].forEach(value => {
+      const cell = document.createElement('td');
+      cell.innerText = value;
+      row.appendChild(cell);
+    });
+    const actions = document.createElement('td');
+    const resetButton = document.createElement('button');
+    resetButton.className = 'chip';
+    resetButton.innerText = 'Reset password';
+    resetButton.addEventListener('click', () => resetPasswordKorporat(account.id));
+    actions.appendChild(resetButton);
+    row.appendChild(actions);
+    table.appendChild(row);
+  });
 }
 
 async function cekSesiAdmin() {
@@ -90,11 +136,36 @@ function pilihContoh(kode) {
   prosesLacak();
 }
 
+function updateStatusPelacakan(status) {
+  const normalized = status.toLowerCase();
+  const delivered = normalized.includes('delivered') || normalized.includes('terkirim');
+  const inTransit = normalized.includes('transit') || normalized.includes('perjalanan');
+  const completed = delivered || inTransit;
+  const currentStep = delivered ? 3 : inTransit ? 2 : 1;
+  const label = delivered ? 'Terkirim' : inTransit ? 'Dalam perjalanan' : 'Resi dibuat';
+
+  const statusBadge = document.getElementById('outStatusBadge');
+  statusBadge.innerText = label;
+  statusBadge.className = `badge ${delivered ? 'b-ok' : inTransit ? 'b-transit' : 'b-wait'}`;
+  document.getElementById('statusIcon').innerText = delivered ? '✓' : inTransit ? '→' : '…';
+  document.getElementById('shipmentProgress').dataset.step = currentStep;
+  document.querySelectorAll('.progress-step').forEach((step, index) => {
+    step.classList.toggle('is-complete', delivered || (inTransit && index === 0));
+    step.classList.toggle('is-current', index + 1 === currentStep);
+    step.classList.toggle('is-upcoming', index + 1 > currentStep);
+    step.setAttribute('aria-current', index + 1 === currentStep ? 'step' : 'false');
+  });
+  document.getElementById('shipmentProgress').classList.toggle('is-delivered', delivered);
+  document.getElementById('shipmentProgress').classList.toggle('is-in-transit', inTransit);
+  document.getElementById('shipmentProgress').classList.toggle('is-created', !completed);
+}
+
 async function prosesLacak() {
   const q = document.getElementById('trackInput').value.trim();
   if (!q) return;
 
   const card = document.getElementById('hasilCard');
+  card.style.display = 'none';
   try {
     const res = await fetch(`/api/track?q=${encodeURIComponent(q)}`);
     const json = await res.json();
@@ -105,11 +176,50 @@ async function prosesLacak() {
 
     const d = json.data;
     aktif = d;
+    lastTrackedQuery = q.toUpperCase();
+    document.getElementById('detailTerlindungi').style.display = 'none';
+    document.getElementById('trackingCodeInput').value = '';
+    document.getElementById('trackingCodeMessage').innerText = '';
     card.style.display = 'block';
     document.getElementById('outTipeBadge').innerText = d.tipe === 'B2B' ? 'B2B KARGO VENDOR' : 'B2C REGULER';
     document.getElementById('outTipeBadge').className = 'badge ' + (d.tipe === 'B2B' ? 'b-b2b' : 'b-b2c');
-    document.getElementById('outStatusBadge').innerText = d.status;
-    document.getElementById('outStatusBadge').className = 'badge ' + (d.status.includes('Delivered') ? 'b-ok' : 'b-wait');
+    updateStatusPelacakan(d.status);
+    document.getElementById('outResi').innerText = d.resi;
+  } catch (err) {
+    alert('Gagal menghubungi server pelacakan.');
+  }
+}
+
+async function verifikasiKodeAkses() {
+  const q = document.getElementById('trackInput').value.trim();
+  const code = document.getElementById('trackingCodeInput').value.trim();
+  const message = document.getElementById('trackingCodeMessage');
+  const details = document.getElementById('detailTerlindungi');
+  details.style.display = 'none';
+
+  if (!q || !code) {
+    message.innerText = 'Masukkan nomor kiriman dan kode akses.';
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/track/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ q, code })
+    });
+    const json = await res.json();
+    if (!res.ok || !json.verified) {
+      message.innerText = json.error || 'Kode akses tidak dapat diverifikasi.';
+      return;
+    }
+
+    const d = json.data;
+    aktif = d;
+    document.getElementById('trackingCodeInput').value = '';
+    document.getElementById('outTipeBadge').innerText = d.tipe === 'B2B' ? 'B2B KARGO VENDOR' : 'B2C REGULER';
+    document.getElementById('outTipeBadge').className = 'badge ' + (d.tipe === 'B2B' ? 'b-b2b' : 'b-b2c');
+    updateStatusPelacakan(d.status);
     document.getElementById('outResi').innerText = d.resi;
     document.getElementById('outRef').innerText = `No. Surat Jalan: ${d.sj} | Ref PO: ${d.po}`;
     document.getElementById('outPengirim').innerText = d.pengirim;
@@ -118,30 +228,42 @@ async function prosesLacak() {
     document.getElementById('outArmada').innerText = d.armada;
     document.getElementById('outPod').innerText = d.pod;
 
-    const ul = document.getElementById('outTimeline');
-    ul.innerHTML = '';
-    d.riwayat.forEach(r => {
-      const li = document.createElement('li');
-      li.innerText = r;
-      ul.appendChild(li);
+    const timeline = document.getElementById('outTimeline');
+    timeline.replaceChildren();
+    d.riwayat.forEach(item => {
+      const entry = document.createElement('li');
+      entry.innerText = item;
+      timeline.appendChild(entry);
     });
+    message.innerText = 'Kode benar. Detail kiriman dibuka.';
+    details.style.display = 'block';
   } catch (err) {
-    alert('Gagal menghubungi server pelacakan.');
+    console.error('Gagal memverifikasi kode akses:', err);
+    message.innerText = 'Gagal menghubungi server. Coba lagi.';
   }
 }
 
 function bukaModal() {
   if (!aktif) return;
   document.getElementById('judulModal').innerText = `Dokumen POD — ${aktif.resi}`;
-  document.getElementById('isiModal').innerHTML = `
-    <p><strong>No. Surat Jalan:</strong> ${aktif.sj} (PO: ${aktif.po})</p>
-    <p><strong>Pengirim:</strong> ${aktif.pengirim}</p>
-    <p><strong>Penerima:</strong> ${aktif.penerima}</p>
-    <p><strong>Muatan Fisik:</strong> ${aktif.koli} Koli (${aktif.berat} Kg)</p>
-    <div style="margin-top:10px; padding:8px; border:2px solid #1e40af; color:#1e40af; font-weight:800; text-align:center;">
-      STEMPEL BASAH GUDANG PENERIMA<br>${aktif.pod.toUpperCase()}
-    </div>
-  `;
+  const content = document.getElementById('isiModal');
+  content.replaceChildren();
+  [
+    ['No. Surat Jalan', `${aktif.sj} (PO: ${aktif.po})`],
+    ['Pengirim', aktif.pengirim],
+    ['Penerima', aktif.penerima],
+    ['Muatan Fisik', `${aktif.koli} Koli (${aktif.berat} Kg)`]
+  ].forEach(([label, value]) => {
+    const paragraph = document.createElement('p');
+    const strong = document.createElement('strong');
+    strong.innerText = `${label}: `;
+    paragraph.append(strong, document.createTextNode(value));
+    content.appendChild(paragraph);
+  });
+  const pod = document.createElement('div');
+  pod.className = 'pod-stamp-preview';
+  pod.innerText = `STATUS POD\n${aktif.pod.toUpperCase()}`;
+  content.appendChild(pod);
   document.getElementById('modalPod').classList.add('open');
 }
 function tutupModal() { document.getElementById('modalPod').classList.remove('open'); }
@@ -241,26 +363,151 @@ function renderCetakan() {
 function renderTabel() {
   document.getElementById('jmlData').innerText = dbCache.length;
   const tb = document.getElementById('tabelAdmin');
-  tb.innerHTML = '';
+  tb.replaceChildren();
   dbCache.forEach(d => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td><strong>${d.resi}</strong></td>
-      <td><span class="badge ${d.tipe === 'B2B' ? 'b-b2b' : 'b-b2c'}">${d.tipe}</span></td>
-      <td>${d.sj}</td>
-      <td>${d.pengirim}</td>
-      <td>${d.penerima}</td>
-      <td>${d.koli} Koli (${d.berat} Kg)</td>
-      <td>${d.status}</td>
-      <td><button class="chip" onclick="pilihContoh('${d.resi}')">Lacak</button></td>
-    `;
+    const values = [d.resi, d.tipe, d.sj];
+    values.forEach((value, index) => {
+      const td = document.createElement('td');
+      if (index === 0) {
+        const strong = document.createElement('strong');
+        strong.innerText = value;
+        td.appendChild(strong);
+      } else if (index === 1) {
+        const badge = document.createElement('span');
+        badge.className = `badge ${d.tipe === 'B2B' ? 'b-b2b' : 'b-b2c'}`;
+        badge.innerText = value;
+        td.appendChild(badge);
+      } else {
+        td.innerText = value ?? '';
+      }
+      tr.appendChild(td);
+    });
+    const companyCell = document.createElement('td');
+    if (d.tipe === 'B2B') {
+      const companySelect = document.createElement('select');
+      companySelect.className = 'shipment-company-select';
+      companySelect.add(new Option('Belum ditautkan', ''));
+      corporateAccounts.filter(account => account.is_active).forEach(account => {
+        companySelect.add(new Option(account.company_name, account.id));
+      });
+      companySelect.value = d.company_id || '';
+      companySelect.setAttribute('aria-label', `Perusahaan untuk kiriman ${d.resi}`);
+      companySelect.addEventListener('change', () => tautkanPerusahaan(d.id, companySelect.value));
+      companyCell.appendChild(companySelect);
+    } else {
+      companyCell.innerText = '—';
+    }
+    tr.appendChild(companyCell);
+    [d.pengirim, d.penerima, `${d.koli} Koli (${d.berat} Kg)`, d.status].forEach(value => {
+      const cell = document.createElement('td');
+      cell.innerText = value ?? '';
+      tr.appendChild(cell);
+    });
+    const actions = document.createElement('td');
+    const trackButton = document.createElement('button');
+    trackButton.className = 'chip';
+    trackButton.innerText = 'Lacak';
+    trackButton.addEventListener('click', () => pilihContoh(d.resi));
+    actions.appendChild(trackButton);
+    if (d.tipe === 'B2C') {
+      const codeButton = document.createElement('button');
+      codeButton.className = 'chip access-code-action';
+      codeButton.innerText = 'Terbitkan kode';
+      codeButton.addEventListener('click', () => terbitkanKodeAkses(d.id));
+      actions.appendChild(codeButton);
+    }
+    tr.appendChild(actions);
     tb.appendChild(tr);
   });
 }
 
-async function buatResiServer() {
+async function buatAkunKorporat(event) {
+  event.preventDefault();
   const payload = {
-    tipe: document.getElementById('inTipe').value,
+    company_name: document.getElementById('companyNameInput').value.trim(),
+    username: document.getElementById('companyUsernameInput').value.trim().toLowerCase(),
+    password: document.getElementById('companyPasswordInput').value
+  };
+  try {
+    const res = await fetch('/api/companies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Gagal membuat akun korporat.');
+      return;
+    }
+    event.target.reset();
+    await muatDaftarPerusahaan();
+    renderTabel();
+    alert(`Akun perusahaan berhasil dibuat.\n\nPerusahaan: ${data.account.company_name}\nUsername: ${data.account.username}\n\nSimpan password yang dimasukkan saat pembuatan dan berikan secara aman kepada perusahaan.`);
+  } catch (error) {
+    console.error('Gagal membuat akun perusahaan:', error);
+    alert('Tidak dapat menghubungi server untuk membuat akun perusahaan.');
+  }
+}
+
+async function resetPasswordKorporat(companyId) {
+  if (!confirm('Buat password sementara baru? Password lama langsung tidak berlaku.')) return;
+  try {
+    const res = await fetch(`/api/companies/${companyId}/reset-password`, {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken }
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Gagal mereset password perusahaan.');
+      return;
+    }
+    alert(`Password sementara (hanya ditampilkan kali ini):\n\nUsername: ${data.username}\nPassword: ${data.temporary_password}\n\nBagikan melalui kanal aman.`);
+  } catch (error) {
+    console.error('Gagal mereset password akun korporat:', error);
+    alert('Tidak dapat menghubungi server untuk mereset password.');
+  }
+}
+
+async function tautkanPerusahaan(shipmentId, companyId) {
+  try {
+    const res = await fetch(`/api/admin/shipments/${shipmentId}/company`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ company_id: companyId || null })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || 'Gagal menautkan kiriman ke perusahaan.');
+      await muatSemuaData();
+      return;
+    }
+    await muatSemuaData();
+  } catch (error) {
+    console.error('Gagal menautkan kiriman ke perusahaan:', error);
+    alert('Tidak dapat menghubungi server untuk menautkan kiriman.');
+  }
+}
+
+async function terbitkanKodeAkses(shipmentId) {
+  if (!confirm('Terbitkan kode baru? Kode lama akan langsung tidak berlaku.')) return;
+  const res = await fetch(`/api/shipments/${shipmentId}/tracking-code`, {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': csrfToken }
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    alert(data.error || 'Gagal menerbitkan kode akses.');
+    return;
+  }
+  alert(`Kode akses untuk ${data.resi} (tampilkan/simpan sekarang; tidak dapat dilihat lagi):\n\n${data.tracking_code}\n\nBagikan hanya kepada penerima yang berhak.`);
+}
+
+async function buatResiServer() {
+  const tipe = document.getElementById('inTipe').value;
+  const payload = {
+    tipe,
+    company_id: tipe === 'B2B' ? document.getElementById('shipmentCompanySelect').value : null,
     sj: document.getElementById('inSJ').value.trim(),
     pengirim: document.getElementById('inPengirim').value.trim(),
     penerima: document.getElementById('inPenerima').value.trim(),
@@ -269,6 +516,9 @@ async function buatResiServer() {
   };
   if (!payload.pengirim || !payload.penerima) {
     return alert('Mohon isi Nama Pengirim dan Penerima.');
+  }
+  if (tipe === 'B2B' && !payload.company_id) {
+    return alert('Pilih akun perusahaan untuk kiriman B2B.');
   }
 
   const res = await fetch('/api/shipments', {
@@ -279,7 +529,13 @@ async function buatResiServer() {
   const json = await res.json();
   if (res.ok) {
     await muatSemuaData();
-    alert(`Resi baru berhasil disimpan ke PostgreSQL: ${json.data.resi}`);
+    if (tipe === 'B2C') {
+      alert(`Resi baru berhasil disimpan: ${json.data.resi}\n\nKode akses detail (tampilkan/simpan sekarang; tidak dapat dilihat lagi):\n${json.tracking_code}\n\nBagikan kode ini hanya kepada penerima yang berhak.`);
+    } else {
+      alert(`Resi B2B ${json.data.resi} berhasil ditautkan ke akun perusahaan.`);
+    }
+  } else {
+    alert(json.error || 'Gagal membuat resi.');
   }
 }
 
@@ -323,7 +579,18 @@ async function unggahExcelServer(e) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   hitungTarif();
-  document.getElementById('trackInput').value = 'DAN-B2B-2611-0001';
+  const trackInput = document.getElementById('trackInput');
+  trackInput.addEventListener('input', () => {
+    if (trackInput.value.trim().toUpperCase() !== lastTrackedQuery) {
+      document.getElementById('hasilCard').style.display = 'none';
+      document.getElementById('detailTerlindungi').style.display = 'none';
+      aktif = null;
+    }
+  });
+  trackInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') prosesLacak();
+  });
+  trackInput.value = 'DAN-B2B-2611-0001';
   prosesLacak();
   if (new URLSearchParams(window.location.search).has('admin')) bukaTab('admin');
 });

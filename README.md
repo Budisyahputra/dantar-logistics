@@ -5,6 +5,8 @@ Sistem informasi pelacakan dan manajemen pengiriman hybrid untuk layanan B2B dan
 ## Fitur
 
 - Pelacakan kiriman menggunakan nomor resi, Surat Jalan (SJ/DO), atau Purchase Order (PO).
+- Pembukaan detail kiriman memakai kode akses acak yang diterbitkan admin; status umum tetap bisa dilihat tanpa kode.
+- Portal korporat B2B dengan akun perusahaan yang dibuat admin dan isolasi kiriman per perusahaan.
 - Kalkulator estimasi ongkos kirim dan rekomendasi armada.
 - Pembuatan resi dari antarmuka dan tampilan cetak AWB/label.
 - Tampilan status kiriman dan informasi POD.
@@ -71,7 +73,15 @@ Aplikasi tersedia di [http://localhost:8000](http://localhost:8000). Gunakan Pow
 |---|---|---|
 | `GET` | `/api/shipments` | Mengambil daftar semua kiriman (login admin) |
 | `GET` | `/api/track?q=<nomor>` | Mencari kiriman berdasarkan resi, SJ, atau PO |
+| `POST` | `/api/track/verify` | Memverifikasi kode akses kiriman dan membuka detail |
+| `GET` | `/corporate/login` | Halaman login pelanggan korporat |
+| `GET` | `/api/corporate/shipments` | Daftar B2B milik akun korporat yang sedang login |
+| `GET` | `/api/companies` | Daftar akun perusahaan (admin) |
+| `POST` | `/api/companies` | Membuat akun perusahaan (admin + token CSRF) |
+| `POST` | `/api/companies/<id>/reset-password` | Membuat password sementara baru (admin + token CSRF) |
+| `POST` | `/api/admin/shipments/<id>/company` | Menautkan atau melepas kiriman B2B (admin + token CSRF) |
 | `POST` | `/api/shipments` | Membuat kiriman dan resi baru (login admin + token CSRF) |
+| `POST` | `/api/shipments/<id>/tracking-code` | Menerbitkan/mengganti kode akses (login admin + token CSRF) |
 | `POST` | `/api/upload-excel` | Mengimpor file Excel melalui field multipart `file` (login admin + token CSRF) |
 | `GET` | `/api/export-excel` | Mengunduh seluruh data sebagai Excel (login admin) |
 
@@ -111,7 +121,11 @@ Salin `.env.example` menjadi `.env` untuk pengembangan lokal. Jangan pernah meng
 | `SESSION_COOKIE_SECURE` | Set `true` jika aplikasi diakses melalui HTTPS |
 | `DATABASE_URL` | URL database opsional; Compose menyusunnya untuk service web |
 
-Daftar database, pembuatan resi, impor, dan ekspor dibatasi untuk sesi admin yang sudah login. Pelacakan melalui `/api/track` tetap publik agar pelanggan dapat mencari kiriman. Sesi menggunakan cookie `HttpOnly`, `SameSite=Lax`, dan token CSRF untuk login serta operasi yang mengubah data. Atur `SESSION_COOKIE_SECURE=true` saat deployment di belakang HTTPS; nilai contoh `false` hanya untuk pengembangan lokal via HTTP.
+Daftar database, pembuatan resi, impor, dan ekspor dibatasi untuk sesi admin yang sudah login. Pelacakan melalui `/api/track` tetap publik agar pelanggan dapat mencari status, tetapi hanya mengembalikan nomor resi, tipe layanan, dan status. Data penerima/pengirim, nomor SJ/PO, muatan, armada, POD, dan riwayat B2C hanya dikirim setelah kode akses benar diverifikasi melalui `/api/track/verify`. Kode akses 16 karakter acak disimpan sebagai HMAC, tidak pernah disertakan dalam ekspor, dan hanya ditampilkan satu kali saat resi B2C dibuat atau kode diterbitkan ulang oleh admin. Percobaan verifikasi dibatasi per kiriman dan alamat IP yang terlihat oleh aplikasi. Bagikan kode akses secara terpisah kepada penerima yang berhak; jika hilang, admin dapat menerbitkan kode baru (kode lama langsung tidak berlaku). Kiriman hasil impor Excel tidak otomatis memiliki kode, jadi admin perlu menerbitkannya dari tabel Portal Admin. Detail B2B hanya dapat diakses melalui akun korporat yang sesuai.
+
+Akun B2B dikelola admin dari Portal Admin. Admin membuat satu akun per perusahaan, lalu menautkan setiap resi B2B ke perusahaan melalui kolom **Perusahaan** pada tabel pengiriman; kiriman lama yang belum ditautkan tidak terlihat oleh akun mana pun. Pembuatan resi B2B baru mewajibkan pemilihan perusahaan. Pelanggan masuk melalui **Portal Korporat** di `/corporate/login` dan hanya dapat melihat kiriman B2B yang ditautkan ke akun tersebut. Password disimpan sebagai hash, percobaan login dibatasi per username dan alamat IP, dan reset password menampilkan password sementara satu kali. Bagikan kredensial melalui kanal aman.
+
+Sesi admin menggunakan cookie `HttpOnly`, `SameSite=Lax`, dan token CSRF untuk operasi yang mengubah data. Atur `SESSION_COOKIE_SECURE=true` saat deployment di belakang HTTPS; nilai contoh `false` hanya untuk pengembangan lokal via HTTP.
 
 ## Struktur repository
 
